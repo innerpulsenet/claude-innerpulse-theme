@@ -2,22 +2,24 @@
 
 A Claude Code mod that dresses the app in the innerpulse look: carbon ink by night and paper by day, an ember accent, and a backdrop scene behind frosted carbon glass.
 
-**The plate** (the default scene). Your innerpulse plate is machined into the ground at the top right, bleeding off the edge. Its six-bar beat echoes out to the left as a long, faint mirrored wave that fades to nothing before the conversation. The fog's tint follows the hour the session started: coral at dawn and dusk, ground-toned by day, cool at night.
+**The mark** (the default scene): the six bars of the innerpulse beat, large and faint at the right of the window, with a soft warm light passing through them one after another every 4.8 seconds.
 
-It moves slowly, like weather: every 12 seconds a soft light ripples through the plate's slots, every 14 seconds a brighter band runs out along the echo, and the fog drifts on a 50-second swing.
+The app frosts its panels over the scene with a tint of the scene's own near-black, so the prompt box sits on the ground rather than as a gray block. That tint matters: untinted glass stopped the scene's motion in the app.
+
+**The plate** (`/innerpulse plate`): the plate machined into the ground at the top right, its beat echoing out to the left as a faint wave, with light rippling through it every 12 seconds.
 
 **Running tool calls** show the working glyph beside their row: the six bars at text height, with light passing through them where the app keeps it moving (desktop and the editor).
 
 **Sound** (off by default): `/innerpulse sound on` plays a soft, synthesized tick when a turn that ran a minute or more finishes. On Linux it plays through PipeWire or PulseAudio; on macOS through the engine's player.
 
-**The dial** is still there as a second scene: a faint graduated dial turning slowly behind drifting fog.
+**The dial** (`/innerpulse dial`): a faint graduated dial turning slowly behind drifting fog.
 
-Everything holds still under reduced motion, and switches to paper colors in light mode.
+Everything holds still under reduced motion. The scenes are drawn for a dark window, so the theme asks the app for one.
 
 **Commands**
 
-- `/innerpulse beat` or `/innerpulse dial` picks the scene; the choice lasts the session.
-- `/innerpulse probe card` and `/innerpulse probe simple` show test scenes for diagnosing a background that will not move; `/innerpulse beat` goes back.
+- `/innerpulse mark`, `/innerpulse plate` or `/innerpulse dial` picks the scene; the choice lasts the session.
+- `/innerpulse glass off` leaves the app's panels unfrosted over the scene; `/innerpulse glass on` frosts them again. Remembered across sessions.
 - `/innerpulse palette off` keeps the backdrop but leaves the app's own colors; `/innerpulse palette on` brings the innerpulse palette back. Remembered across sessions.
 - `/innerpulse sound on`, `/innerpulse sound off`, `/innerpulse sound test`.
 - `/innerpulse off` turns the theme off; `/innerpulse` turns it back on.

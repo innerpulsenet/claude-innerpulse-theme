@@ -8,7 +8,7 @@ const BACKDROP = {
   plugin: 'innerpulse-theme',
   component: 'Backdrop',
   surface: 'desktop',
-  props: { scene: 'innerpulse-beat', plugin: 'innerpulse-theme', glass: { blur: 14, opacity: 0.66 } },
+  props: { scene: 'innerpulse-mark', plugin: 'innerpulse-theme', glass: { blur: 14, tint: '#0b0d10', opacity: 0.5 } },
 } as const
 
 // The engine beneath the mod: the ops it calls, and the ends of the chains it hooks
@@ -44,7 +44,7 @@ const scene = async ($: Engine) => {
   return { alt: String(svg?.props.alt), source: String(svg?.props.source) }
 }
 
-test('the plate loops on its own, turns leave it alone, and the palette can be left off', async ($, on) => {
+test('the mark loops on its own under tinted glass, turns leave it alone, and the palette and glass can be left off', async ($, on) => {
   const clock = mock.clock(on, { now: T0 })
   mock.store(on, {})
   const w = engine(on)
@@ -52,11 +52,13 @@ test('the plate loops on its own, turns leave it alone, and the palette can be l
   await $.session.start({ cwd: '/tmp/x', surface: 'desktop', isInteractive: true })
 
   const rest = await scene($)
-  expect(rest.alt).toContain('innerpulse plate')
+  expect(rest.alt).toContain('innerpulse mark')
   // One drawing whose motion loops by itself, still under reduced motion
   expect(rest.source).toContain('infinite')
   expect(rest.source).toContain('prefers-reduced-motion')
   expect(sets.at(-1)?.colors).toBeDefined()
+  // The glass is always tinted: untinted glass stopped the motion in the app
+  expect(JSON.stringify(sets.at(-1))).toContain('"tint":"#0b0d10"')
 
   await $.prompt.submit({ text: 'go' } as never)
   await $.tool.call({ tool: 'Bash', command: 'false' } as never)
@@ -66,8 +68,10 @@ test('the plate loops on its own, turns leave it alone, and the palette can be l
   expect((await scene($)).source).toBe(rest.source)
 
   const off = await $.command.run({ command: 'innerpulse', args: 'palette off' } as never)
-  expect(String(off.text)).toContain('without the innerpulse palette')
+  expect(String(off.text)).toContain('palette off')
   expect(sets.at(-1)?.colors).toBeUndefined()
+  await $.command.run({ command: 'innerpulse', args: 'glass off' } as never)
+  expect(JSON.stringify(sets.at(-1))).toContain('"glass":false')
 
   // Sound is off until asked for; on, a long turn ends with the tick
   expect(w.ran).toEqual([])

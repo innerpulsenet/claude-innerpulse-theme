@@ -5,16 +5,22 @@ import type { SceneName } from '../types'
 import { plateScene, workingGlyph } from './plate'
 import { makeColors } from './make-colors.js'
 import { GEOMETRY } from './geometry'
-import { probeScene, simpleScene } from './probe'
+import { markScene } from './mark'
 import { SCENE as DIAL } from './scene'
 
 const P = 'innerpulse-theme'
-const sceneAtom = atom({ plugin: 'innerpulse-theme', key: 'scene' } as const, 'beat' as SceneName)
+const sceneAtom = atom({ plugin: 'innerpulse-theme', key: 'scene' } as const, 'mark' as SceneName)
 // Read once at session start, so the backdrop hook reads nothing while it draws, as the
 // theme-examples hooks do
 let hour = 12
 // Whether the theme brings its palette as well as the backdrop; off leaves the app's own colors
 const PALETTE = 'palette'
+// Whether the app frosts its panels over the scene; off leaves them as they are
+const GLASS = 'glass'
+// The panels' frost, tinted to the scene's own near-black so the prompt box sits on the ground
+// rather than as a gray block. Untinted glass at 0.66 stopped the scene's motion in this app;
+// the theme-examples scenes all tint theirs, at 0.55 or less.
+const FROST = { blur: 14, tint: '#0b0d10', opacity: 0.5 }
 
 const SOUND = 'sound'
 // A turn this long earns the finish tick, when the sound is on
@@ -54,15 +60,18 @@ const { theme, problems } = makeColors({
   },
 })
 
-// Panels keep their own (now themed) color, frosted over the scene.
-const look = (scene: SceneName | 'probe-card' | 'probe-simple', withPalette: boolean): ThemeSetArgs => ({
+// The scenes are drawn for a dark window, so the look asks for one
+const look = (scene: SceneName, withPalette: boolean, withGlass: boolean): ThemeSetArgs => ({
   ...(withPalette && { colors: theme }),
-  backdrop: { scene: `innerpulse-${scene}`, glass: { blur: 14, opacity: 0.66 } },
+  backdrop: { scene: `innerpulse-${scene}`, glass: withGlass ? FROST : false },
+  overrideColorScheme: 'dark',
 })
 
-// Sets the look, with the palette unless /innerpulse palette off left it out
+// Sets the look, with the palette and the glass unless /innerpulse turned either off
 async function apply($: EngineInterface) {
-  return $.theme.set(look(await read($, sceneAtom), (await $.store.get(PALETTE)) !== false))
+  return $.theme.set(
+    look(await read($, sceneAtom), (await $.store.get(PALETTE)) !== false, (await $.store.get(GLASS)) !== false),
+  )
 }
 
 const hourOf = (ms: number) => new Date(ms).getHours()
@@ -84,7 +93,7 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'innerpulse',
-      description: 'innerpulse theme: beat, dial, palette on|off, off, or sound on|off|test',
+      description: 'innerpulse theme: mark, plate, dial, glass on|off, palette on|off, off, or sound on|off|test',
     })
     const unpainted = problems.find(line => line.startsWith("Desktop won't paint"))
     if (unpainted !== undefined) $.ui.toast(unpainted)
@@ -119,28 +128,15 @@ export const register: Register = on => {
       }
     }
     if (arg === 'palette' && (value === 'on' || value === 'off')) await $.store.set(PALETTE, value === 'on')
-    // Test scenes, to find what stops the backdrop's motion; /innerpulse beat goes back
-    if (arg === 'probe' && (value === 'card' || value === 'simple')) {
-      const withPalette = (await $.store.get(PALETTE)) !== false
-      await $.theme.set(
-        value === 'card'
-          ? look('probe-card', withPalette)
-          : { ...(withPalette && { colors: theme }), backdrop: { scene: 'innerpulse-probe-simple', glass: false } },
-      )
-      return {
-        text:
-          value === 'card'
-            ? 'innerpulse probe card: a red square that keeps blinking and a green dot that keeps sliding mean motion works. /innerpulse beat goes back.'
-            : 'innerpulse probe simple: the six bars of the mark with light passing through them every 4.8 seconds, and no frosted glass. /innerpulse beat goes back.',
-      }
-    }
-    if (arg === 'beat' || arg === 'dial') await update($, sceneAtom, () => arg)
+    if (arg === 'glass' && (value === 'on' || value === 'off')) await $.store.set(GLASS, value === 'on')
+    if (arg === 'mark' || arg === 'plate' || arg === 'dial') await update($, sceneAtom, () => arg)
     const scene = await read($, sceneAtom)
     const set = await apply($)
-    const palette = (await $.store.get(PALETTE)) !== false ? 'with' : 'without'
+    const palette = (await $.store.get(PALETTE)) !== false ? 'on' : 'off'
+    const glass = (await $.store.get(GLASS)) !== false ? 'on' : 'off'
     return {
       text: set.isDrawn
-        ? `innerpulse theme on, scene: ${scene}, ${palette} the innerpulse palette.`
+        ? `innerpulse theme on: scene ${scene}, palette ${palette}, glass ${glass}.`
         : `innerpulse theme set, but nothing draws it here: ${set.reason}`,
     }
   })
@@ -150,11 +146,10 @@ export const register: Register = on => {
     if (e.props.plugin !== P || e.surface !== 'desktop') return next(e)
     const { Svg } = $.ui.resolve(e)
     if (e.props.scene === 'innerpulse-dial') return <Svg isInteractive alt="A faint graduated dial turning slowly behind drifting fog" source={DIAL} />
-    if (e.props.scene === 'innerpulse-probe-card') return <Svg isInteractive alt="The innerpulse test card" source={probeScene()} />
-    if (e.props.scene === 'innerpulse-probe-simple') {
-      return <Svg isInteractive alt="The six bars of the innerpulse mark, light passing through them" source={simpleScene(GEOMETRY.bars)} />
+    if (e.props.scene === 'innerpulse-mark') {
+      return <Svg isInteractive alt="The six bars of the innerpulse mark, light passing through them" source={markScene(GEOMETRY.bars)} />
     }
-    if (e.props.scene !== 'innerpulse-beat') return next(e)
+    if (e.props.scene !== 'innerpulse-plate') return next(e)
     return (
       <Svg
         isInteractive
@@ -164,8 +159,7 @@ export const register: Register = on => {
     )
   })
 
-  // A running tool call shows the working glyph beside its row, at once: the desktop holds an
-  // animation still after about two seconds, so a delayed fade-in would never show
+  // A running tool call shows the working glyph beside its row
   on('ui.render', { component: 'ToolUse' }, async ($, e, next) => {
     const row = await next(e)
     if (!e.props.isRunning || (e.surface !== 'desktop' && e.surface !== 'vscode')) return row

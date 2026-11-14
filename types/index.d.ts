@@ -1,4 +1,4 @@
-export type SceneName = 'beat' | 'dial'
+export type SceneName = 'mark' | 'plate' | 'dial'
 
 declare module 'claude-code' {
   interface PluginState {
