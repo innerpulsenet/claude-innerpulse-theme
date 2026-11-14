@@ -1,0 +1,102 @@
+import { expect, mock, test } from 'claude-code/testing'
+import type { Engine } from 'claude-code/testing'
+import type { On } from 'claude-code'
+
+const T0 = Date.parse('2026-11-14T15:00:00Z')
+
+const BACKDROP = {
+  plugin: 'innerpulse-theme',
+  component: 'Backdrop',
+  surface: 'desktop',
+  props: { scene: 'innerpulse-beat', plugin: 'innerpulse-theme', glass: { blur: 14, opacity: 0.72 } },
+} as const
+
+// The engine beneath the mod: the ops it calls, and the ends of the chains it hooks
+const engine = (on: On) => {
+  const ran: string[][] = []
+  on('command.register', () => ({ value: { command: 'innerpulse' } }))
+  on('theme.set', () => ({ value: { isDrawn: true, requestId: 'r1' } }))
+  on('ui.toast', () => ({ value: undefined }))
+  on('process.run', (_, e) => (ran.push([...e.argv]), { value: { exitCode: 0, stdout: '', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('prompt.submit', (_, e) => e as never)
+  on('tool.call', (_, e) => ((e as { command?: string }).command === 'false' ? { result: 'boom', isError: true } : { result: 'ok' }) as never)
+  on('turn.complete', (_, e) => ({ text: e.answer, usage: e.usage }))
+  on('turn.step', async function* (_, e) {
+    return {
+      turnId: e.turnId,
+      index: e.index,
+      answer: '',
+      toolUses: [],
+      stopReason: 'end_turn',
+      messageCount: e.messageCount,
+      usage: { model: e.model, input_tokens: 500, output_tokens: 900, cache_read_input_tokens: 30_000, cache_creation_input_tokens: 2_000 },
+    } as never
+  })
+  return { ran }
+}
+
+const scene = async ($: Engine) => {
+  const ui = await $.ui.mount(BACKDROP as never)
+  const svg = await ui.find({ type: 'Svg' })
+  await ui.unmount()
+  return { alt: String(svg?.props.alt), source: String(svg?.props.source) }
+}
+
+test('the plate lights with the work, cools after it, and flashes a slot on a failed call', async ($, on) => {
+  const clock = mock.clock(on, { now: T0 })
+  mock.store(on, {})
+  const w = engine(on)
+  await $.session.start({ cwd: '/tmp/x', surface: 'desktop', isInteractive: true })
+
+  expect((await scene($)).alt).toContain('at rest')
+
+  await $.prompt.submit({ text: 'go' } as never)
+  const thinking = await scene($)
+  expect(thinking.alt).toContain('thinks')
+  expect(thinking.source).toContain('@keyframes th')
+
+  // A failed tool call: one slot flashes, and with no tool left running the plate thinks again
+  await $.tool.call({ tool: 'Bash', command: 'false' } as never)
+  const failed = await scene($)
+  expect(failed.source).toContain('class="flash"')
+  expect(failed.alt).toContain('thinks')
+  await clock.advance(3_500)
+  expect((await scene($)).source).not.toContain('class="flash"')
+
+  const s = $.turn.step({ turnId: 't', index: 0, model: 'claude-opus-5-5', messageCount: 3 })
+  for await (const _ of s);
+  await $.turn.complete({ answer: 'a', durationMs: 90_000, isAborted: false, turnId: 't', reason: 'answer' } as never)
+  const cooling = await scene($)
+  expect(cooling.alt).toContain('cooling')
+  // The finished turn joins the reading behind the plate
+  expect(cooling.source).toContain('class="reading"')
+
+  await clock.advance(6_500)
+  expect((await scene($)).alt).toContain('at rest')
+
+  // Sound is off until asked for; on, a long turn ends with the tick
+  expect(w.ran).toEqual([])
+  await $.command.run({ command: 'innerpulse', args: 'sound on' } as never)
+  await clock.advance(10)
+  expect(w.ran[0]?.[0]).toBe('pw-play')
+})
+
+test('a long tool call earns the working glyph on desktop, not in the terminal', async ($, on) => {
+  mock.clock(on, { now: T0 })
+  mock.store(on, {})
+  engine(on)
+  await $.session.start({ cwd: '/tmp/x', surface: 'desktop', isInteractive: true })
+  for (const surface of ['desktop', 'terminal'] as const) {
+    const ui = await $.ui.mount({
+      plugin: 'innerpulse-theme',
+      component: 'ToolUse',
+      surface,
+      props: { tool_use_id: 'tu1', tool: 'Bash', input: {}, isRunning: true, isErrored: false, isInterrupted: false },
+    } as never)
+    const glyph = await ui.find({ type: 'Svg' })
+    if (surface === 'desktop') expect(String(glyph?.props.source)).toContain('animation-delay:8s')
+    else expect(glyph).toBeUndefined()
+    await ui.unmount()
+  }
+})

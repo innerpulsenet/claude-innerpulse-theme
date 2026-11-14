@@ -2,19 +2,31 @@
 
 A Claude Code mod that dresses the app in the innerpulse look: carbon ink by night and paper by day, an ember accent, and a backdrop scene behind frosted carbon glass.
 
-**Scenes**
+**The live plate** (the default scene). Your innerpulse plate, enlarged and machined into the ground at the right edge, lit by what Claude is doing, at half the brand's working-indicator pace so it stays ambient:
 
-- **beat** (the default): the innerpulse plate, enlarged and machined into the ground at the right edge, with ember light passing through its six slots every 9 seconds.
-- **dial**: a faint graduated dial turning slowly behind drifting fog.
+- **At rest** between turns, its slots dark.
+- **Thinking:** light rises through the slots in turn, the strike hottest, every 4.8 s (7.2 s once a wait passes 20 s).
+- **A tool running:** light passes through the standing plate, left to right, every 2.4 s.
+- **Done:** the afterglow; the slots' light cools away over five seconds.
+- **A failed tool call or a cache miss** lights one slot red, once.
 
-Both hold still under reduced motion, and switch to paper colors in light mode.
+Behind it, faint on the left, is the brand's reading: this session's own turns as a mirrored band, one bar per turn sized by its prompt, newest nearest the plate. The fog's tint follows the time of day: coral at dawn and dusk, ground-toned by day, cool at night.
+
+**Long tool calls** get the working glyph beside their row once they have run eight seconds: the six bars at text height with light passing through them (desktop and the editor).
+
+**Sound** (off by default): `/innerpulse sound on` plays a soft, synthesized tick when a turn that ran a minute or more finishes. On Linux it plays through PipeWire or PulseAudio; on macOS through the engine's player.
+
+**The dial** is still there as a second scene: a faint graduated dial turning slowly behind drifting fog.
+
+Everything holds still under reduced motion, and switches to paper colors in light mode.
 
 **Commands**
 
-- `/innerpulse beat` or `/innerpulse dial` picks the scene.
+- `/innerpulse beat` or `/innerpulse dial` picks the scene; the choice lasts the session.
+- `/innerpulse sound on`, `/innerpulse sound off`, `/innerpulse sound test`.
 - `/innerpulse off` turns the theme off; `/innerpulse` turns it back on.
 
-Each session starts on the beat scene.
+**Rebuilding the generated files**: `node scripts/build-geometry.mjs <path to the innerpulse-brand kit's scripts/pulse.mjs>` writes `hooks/geometry.ts`; `node scripts/build-sound.mjs` writes `sounds/done.wav`.
 
 ## Install
 
