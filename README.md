@@ -2,14 +2,14 @@
 
 A Claude Code mod that dresses the app in the innerpulse look: carbon ink by night and paper by day, an ember accent, and a backdrop scene behind frosted carbon glass.
 
-**The live plate** (the default scene). Your innerpulse plate, enlarged and machined into the ground at the right edge, lit by what Claude is doing, at half the brand's working-indicator pace so it stays ambient:
+**The live plate** (the default scene). Your innerpulse plate, enlarged and machined into the ground at the right edge, lit by what Claude is doing, quietly so it stays ambient:
 
 - **At rest** between turns, its slots dark.
-- **Working:** from the moment you send until the turn ends, light rises through the slots in turn, the strike hottest, every 4.8 s.
-- **Done:** the afterglow; the slots' light cools away over five seconds.
-- **A turn that had a failed tool call or a cache miss** cools one slot from red in its afterglow.
+- **Working:** when you send, light strikes through the slots in turn and settles to a steady glow that holds until the turn ends.
+- **Done:** the glow cools away.
+- **A turn that had a failed tool call or a cache miss** leaves one slot with a faint red ember until the next turn.
 
-The scene changes only when a turn starts and when it ends: the desktop reloads the drawing on every change, so everything in between is animation inside one drawing.
+The desktop app runs a background's animation for about two seconds after each redraw and then holds it still. So the plate moves only in short transitions as a turn starts and ends, and each state ends on a still frame.
 
 Behind it, faint on the left, is the brand's reading: this session's own turns as a mirrored band, one bar per turn sized by its prompt, newest nearest the plate. The fog's tint follows the time of day: coral at dawn and dusk, ground-toned by day, cool at night.
 
@@ -17,7 +17,7 @@ Behind it, faint on the left, is the brand's reading: this session's own turns a
 
 **Sound** (off by default): `/innerpulse sound on` plays a soft, synthesized tick when a turn that ran a minute or more finishes. On Linux it plays through PipeWire or PulseAudio; on macOS through the engine's player.
 
-**The dial** is still there as a second scene: a faint graduated dial turning slowly behind drifting fog.
+**The dial** is still there as a second scene: a faint graduated dial behind fog (its slow turning needs a surface that keeps animating the background).
 
 Everything holds still under reduced motion, and switches to paper colors in light mode.
 

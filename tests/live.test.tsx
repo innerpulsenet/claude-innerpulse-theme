@@ -55,6 +55,7 @@ test('the plate lights for the turn, holds through its tool calls, and cools aft
   const working = await scene($)
   expect(working.alt).toContain('while Claude works')
   expect(working.source).toContain('@keyframes th')
+  expect(working.source).toContain('.lamp{opacity:.6}')
 
   // Tool calls inside the turn change nothing: the drawing is not redrawn mid-turn
   await $.tool.call({ tool: 'Bash', command: 'false' } as never)
@@ -75,7 +76,8 @@ test('the plate lights for the turn, holds through its tool calls, and cools aft
   await clock.advance(5_500)
   const rested = await scene($)
   expect(rested.alt).toContain('at rest')
-  expect(rested.source).not.toContain('class="flag"')
+  // The troubled turn's ember stays; nothing is left to animate
+  expect(rested.source).toContain('class="flag"')
   expect(rested.source).not.toContain('@keyframes')
 
   // Status reports the draws: rest, then working, then the afterglow, then rest

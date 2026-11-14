@@ -229,7 +229,7 @@ export const register: Register = on => {
       hour,
       flag: live.flag,
     })
-    const doing = { idle: 'at rest', work: 'lit in turn while Claude works', done: 'cooling after the turn' }
+    const doing = { idle: 'at rest', work: 'glowing while Claude works', done: 'cooling after the turn' }
     const mode = live.mode === 'done' && now - live.since >= AFTERGLOW_MS ? 'idle' : live.mode
     draws.push({ mode, at: now })
     if (draws.length > 12) draws.shift()

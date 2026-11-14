@@ -1,18 +1,26 @@
 // The live beat scene, drawn at runtime from what the session is doing. It follows the brand's
 // working indicator (references/working.md in the kit), slowed to an ambient pace:
 //   idle   the plate at rest, its slots dark
-//   work   the retake: light rises through the slots in turn, the strike hottest, every 4.8 s
-//   done   the afterglow: the slots' light cools away over five seconds, then the plate rests;
-//          a slot is cooled from red when the turn had a failed tool call or a cache miss
-// The desktop reloads the drawing on every redraw, so the scene changes only twice a turn (work at
-// the prompt, done at the end) and everything in between is CSS animation inside one drawing.
+//   work   ignition: light strikes through the slots in turn and settles to a steady glow
+//   done   cooling: the glow goes out; a slot keeps a faint red ember until the next turn when
+//          the turn had a failed tool call or a cache miss
+// The desktop runs a backdrop's animation for about two seconds after each draw and then holds
+// it still, so each state is a short transition that ends on a still frame, never a loop.
 // Behind the plate, the brand's "reading": this session's own turn sizes as a faint mirrored band.
 // The plate only ever moves as light; under reduced motion it holds still.
 import { GEOMETRY as G } from './geometry'
 
 export type Mode = 'idle' | 'work' | 'done'
-// The afterglow's length; past it a done plate draws as one at rest
-export const AFTERGLOW_MS = 5_000
+// The desktop runs a backdrop's animation for about two seconds after each draw, then holds it
+// still, so each change of state is a short transition that ends on a still: past this, a redraw
+// draws the still alone
+export const MOTION_MS = 1_800
+// The cooling's length; past it a done plate is at rest
+export const AFTERGLOW_MS = MOTION_MS
+// A working slot's steady glow, and a troubled turn's leftover ember
+const LIT = '.6'
+const EMBER = '.4'
+
 
 export type SceneInput = {
   mode: Mode
@@ -43,24 +51,30 @@ export const partOfDay = (hour: number): keyof typeof FOG =>
 
 function lampCss(mode: Mode, elapsedMs: number, flag: number | null): string {
   const T = G.think
-  const rules: string[] = []
+  // Motion only while the change is fresh: a later redraw of the same state draws its still
+  const isFresh = elapsedMs < MOTION_MS
+  const rules: string[] = [`.flag{opacity:${EMBER}}`]
   if (mode === 'work') {
-    const period = T.period * 2 * 1000
-    rules.push(`@keyframes th{0%{opacity:0}9%{opacity:1}30%{opacity:.35}40%{opacity:0}100%{opacity:0}}`)
-    G.slots.forEach((_, i) => {
-      const start = (T.riseAt + i * T.riseLag) * period
-      rules.push(`.l${i}{animation:th ${s(period)} linear infinite both;animation-delay:${s(start - (elapsedMs % period))}}`)
-    })
-    // Where a surface does not run the animation, the working plate still holds a steady glow
-    rules.unshift(`.lamp{opacity:.35}`)
+    // Ignition: light strikes through the slots in turn, then settles to a steady glow
+    rules.push(`.lamp{opacity:${LIT}}`)
+    if (isFresh) {
+      rules.push(`@keyframes th{0%{opacity:0}35%{opacity:1}100%{opacity:${LIT}}}`)
+      G.slots.forEach((_, i) => {
+        rules.push(`.l${i}{animation:th 1.1s ease-out both;animation-delay:${s(i * T.riseLag * 1000 * 1.6 - elapsedMs)}}`)
+      })
+    }
   } else if (mode === 'done') {
-    rules.push(`@keyframes gl{0%{opacity:.8}100%{opacity:0}}`)
-    rules.push(`.lamp,.flag{animation:gl ${s(AFTERGLOW_MS)} cubic-bezier(.2,.6,.3,1) forwards;animation-delay:${s(-elapsedMs)}}`)
+    // Cooling: the glow goes out; a troubled turn's slot keeps a faint red ember until the next
+    if (isFresh) {
+      rules.push(`@keyframes gl{0%{opacity:${LIT}}100%{opacity:0}}@keyframes fl{0%{opacity:1}100%{opacity:${EMBER}}}`)
+      rules.push(`.lamp{animation:gl 1.4s cubic-bezier(.2,.6,.3,1) both;animation-delay:${s(-elapsedMs)}}`)
+      rules.push(`.flag{animation:fl 1.6s ease-out both;animation-delay:${s(-elapsedMs)}}`)
+    }
   }
-  // Reduced motion: no movement; a working plate keeps a faint steady light
+  // Reduced motion: every state drawn as its still
   const still =
-    `@media (prefers-reduced-motion:reduce){.lamp{animation:none;opacity:${mode === 'work' ? '.4' : '0'}}` +
-    `.flag{animation:none;opacity:0}.spill{animation:none}}`
+    `@media (prefers-reduced-motion:reduce){.lamp{animation:none;opacity:${mode === 'work' ? LIT : '0'}}` +
+    `.flag{animation:none;opacity:${EMBER}}.spill{animation:none}}`
   return rules.join('') + still
 }
 
@@ -85,9 +99,9 @@ function reading(turns: readonly number[]): string {
 }
 
 export function liveScene(input: SceneInput): string {
-  // A done plate whose afterglow has cooled draws at rest, so a later redraw replays nothing
-  const o: SceneInput = input.mode === 'done' && input.elapsedMs >= AFTERGLOW_MS ? { ...input, mode: 'idle', flag: null } : input
-  const flag = o.mode === 'done' ? (o.flag ?? null) : null
+  const o = input
+  // The ember stays until the next turn starts (which draws with no flag)
+  const flag = o.mode === 'work' ? null : (o.flag ?? null)
   const fog = FOG[partOfDay(o.hour)]
   const lamps = G.slots
     .map(
@@ -107,11 +121,12 @@ export function liveScene(input: SceneInput): string {
     )
     .join('')
   // The plate's spill of light: breathing with the work, cooling with the afterglow
+  const isFresh = o.elapsedMs < MOTION_MS
   const spillCss =
     o.mode === 'work'
-      ? `.spill{opacity:.5;animation:sp 4.8s ease-in-out infinite alternate}@keyframes sp{from{opacity:.25}to{opacity:.6}}`
-      : o.mode === 'done'
-        ? `.spill{animation:gl ${s(AFTERGLOW_MS)} ease-out forwards;animation-delay:${s(-o.elapsedMs)}}`
+      ? `.spill{opacity:.5}` + (isFresh ? `.spill{animation:sp 1.2s ease-out both}@keyframes sp{from{opacity:0}to{opacity:.5}}` : '')
+      : o.mode === 'done' && isFresh
+        ? `.spill{animation:sc 1.4s ease-out both;animation-delay:${s(-o.elapsedMs)}}@keyframes sc{from{opacity:.5}to{opacity:0}}`
         : `.spill{opacity:0}`
 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid slice">
