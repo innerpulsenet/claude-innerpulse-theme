@@ -49,6 +49,7 @@ test('the plate drifts a step at a time and turns do not change it', async ($, o
   const w = engine(on)
   await $.session.start({ cwd: '/tmp/x', surface: 'desktop', isInteractive: true })
 
+  await $.command.run({ command: 'innerpulse', args: 'drift' } as never)
   const rest = await scene($)
   expect(rest.alt).toContain('innerpulse plate')
   expect(rest.source).toContain('class="echo"')

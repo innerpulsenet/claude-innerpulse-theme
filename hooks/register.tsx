@@ -12,8 +12,9 @@ const sceneAtom = atom({ plugin: 'innerpulse-theme', key: 'scene' } as const, 'b
 // The drift's step: each step is one redraw of the plate scene, which moves it a little
 const phaseAtom = atom({ plugin: 'innerpulse-theme', key: 'phase' } as const, 0)
 
-// The drift is on unless /innerpulse still turned it off (kept across sessions)
-const STILL = 'still'
+// The drift is off unless /innerpulse drift turned it on (kept across sessions): where the app
+// freezes backdrop motion, each step only reads as a flicker
+const DRIFT = 'drift'
 // How often the drift redraws the backdrop
 const DRIFT_MS = 18_000
 
@@ -93,7 +94,7 @@ export const register: Register = on => {
     if (!set.isDrawn) $.ui.status(`innerpulse: ${set.reason}`)
     // The drift: a step every 18 s; writing the phase redraws the backdrop alone
     $.clock.every(DRIFT_MS, async () => {
-      if ((await $.store.get(STILL)) === true) return
+      if ((await $.store.get(DRIFT)) !== true) return
       await update($, phaseAtom, prev => prev + 1)
     })
     return next(e)
@@ -135,7 +136,7 @@ export const register: Register = on => {
       }
     }
     if (arg === 'still' || arg === 'drift') {
-      await $.store.set(STILL, arg === 'still')
+      await $.store.set(DRIFT, arg === 'drift')
       await update($, phaseAtom, prev => prev + 1)
       return {
         text:
@@ -161,7 +162,7 @@ export const register: Register = on => {
     if (e.props.scene === 'innerpulse-dial') return <Svg source={DIAL} alt="A faint graduated dial behind fog" isInteractive />
     if (e.props.scene !== 'innerpulse-beat') return next(e)
     const phase = await read($, phaseAtom)
-    const isStill = (await $.store.get(STILL)) === true
+    const isStill = (await $.store.get(DRIFT)) !== true
     return (
       <Svg
         source={plateScene(await read($, hourAtom), isStill ? undefined : phase)}
