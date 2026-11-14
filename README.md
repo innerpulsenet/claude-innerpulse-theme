@@ -2,7 +2,9 @@
 
 A Claude Code mod that dresses the app in the innerpulse look: carbon ink by night and paper by day, an ember accent, and a backdrop scene behind frosted carbon glass.
 
-**The mark** (the default scene): the six bars of the innerpulse beat, large and faint at the right of the window, with a soft warm light passing through them one after another every 4.8 seconds.
+**The columns** (the default scene): the six bars of the innerpulse mark scaled up to fill the window as tall, soft-edged columns of light. Each glows and fades on its own slow rhythm, so the mark keeps re-forming, and the light's color drifts over a minute from inky blue through plum to a dim ember and back.
+
+**The mark** (`/innerpulse mark`): the six bars of the innerpulse beat, large and faint at the right of the window, with a soft warm light passing through them one after another every 4.8 seconds.
 
 The app frosts its panels over the scene with a tint of the scene's own near-black, so the prompt box sits on the ground rather than as a gray block. That tint matters: untinted glass stopped the scene's motion in the app.
 
@@ -18,7 +20,7 @@ Everything holds still under reduced motion. The scenes are drawn for a dark win
 
 **Commands**
 
-- `/innerpulse mark`, `/innerpulse plate` or `/innerpulse dial` picks the scene; the choice lasts the session.
+- `/innerpulse columns`, `/innerpulse mark`, `/innerpulse plate` or `/innerpulse dial` picks the scene; the choice lasts the session.
 - `/innerpulse glass off` leaves the app's panels unfrosted over the scene; `/innerpulse glass on` frosts them again. Remembered across sessions.
 - `/innerpulse palette off` keeps the backdrop but leaves the app's own colors; `/innerpulse palette on` brings the innerpulse palette back. Remembered across sessions.
 - `/innerpulse sound on`, `/innerpulse sound off`, `/innerpulse sound test`.
