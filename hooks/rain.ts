@@ -2,7 +2,10 @@
 // glyphs. A dim, still field of hex digits and signs fills each bar; brighter trails fall through
 // it at their own speeds, their heads warm, their tails fading. Under it the columns scene's soft
 // glow keeps the mark's shape readable, its color drifting from inky blue through plum to a dim
-// ember over a minute.
+// ember over a minute. Each bar's edges fade softly into the ground.
+//
+// Behind it all, two quiet layers for the whole window: a much fainter glyph field drifting down
+// over three minutes, and a broad pool of the same shifting light wandering across over 95 s.
 //
 // Built from what the theme-examples scenes use: CSS animation, patterns, gradients and masks,
 // no filter. Each glyph field is one pattern, so the drawing stays small.
@@ -22,6 +25,9 @@ const COLS = 29
 const ROWS = 40
 const GLYPHS = '0123456789ABCDEF:+=<>|*'
 const HUES = ['#2d4170', '#4b3166', '#6a2e2a', '#2d4170']
+// How far each bar's soft edge reaches past the bar, in CSS px
+const PAD_X = 34
+const PAD_Y = 70
 
 // A fixed sequence, so every draw is the same drawing
 function random(seed: number) {
@@ -80,7 +86,14 @@ export function rainScene(): string {
   const glow = bars
     .map((b, i) => `<rect class="c${i}" x="${f(b.x)}" y="${f(b.y)}" width="${f(b.w)}" height="${f(b.h)}" fill="url(#soft)"/>`)
     .join('')
-  const shape = bars.map(b => `<rect x="${f(b.x)}" y="${f(b.y)}" width="${f(b.w)}" height="${f(b.h)}"/>`).join('')
+  // The mark's shape as two soft masks, multiplied: one fading each bar's sides, one its ends, so
+  // the glyph field melts into the ground instead of stopping at a hard edge
+  const softX = bars
+    .map(b => `<rect x="${f(b.x - PAD_X)}" y="${f(b.y - PAD_Y)}" width="${f(b.w + 2 * PAD_X)}" height="${f(b.h + 2 * PAD_Y)}" fill="url(#sx)"/>`)
+    .join('')
+  const softY = bars
+    .map(b => `<rect x="${f(b.x - PAD_X)}" y="${f(b.y - PAD_Y)}" width="${f(b.w + 2 * PAD_X)}" height="${f(b.h + 2 * PAD_Y)}" fill="url(#sy)"/>`)
+    .join('')
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid slice">
 <style>
 .hue{animation:hue 60s linear infinite}
@@ -89,7 +102,9 @@ export function rainScene(): string {
 ${breathe}
 @keyframes fall{from{transform:translateY(0)}to{transform:translateY(var(--d))}}
 ${rules.join('')}
-@media (prefers-reduced-motion: reduce){.hue,[class^="c"],[class^="t"]{animation:none}.trails{display:none}}
+.amb{animation:amb 180s linear infinite}@keyframes amb{to{transform:translateY(${ROWS * CH}px)}}
+.wander{animation:wander 95s ease-in-out infinite alternate}@keyframes wander{0%{transform:translate(-260px,-120px)}50%{transform:translate(380px,160px)}100%{transform:translate(-80px,240px)}}
+@media (prefers-reduced-motion: reduce){.hue,[class^="c"],[class^="t"],.amb,.wander{animation:none}.trails{display:none}}
 </style>
 <defs>
 <linearGradient id="soft" x1="0" y1="0" x2="1" y2="0">
@@ -104,19 +119,25 @@ ${rules.join('')}
 <stop offset="0" stop-color="#000"/><stop offset=".2" stop-color="#fff"/><stop offset=".72" stop-color="#fff"/><stop offset="1" stop-color="#000"/>
 </linearGradient>
 <mask id="fade" maskUnits="userSpaceOnUse" x="0" y="0" width="${W}" height="${H}"><rect width="${W}" height="${H}" fill="url(#fadeY)"/></mask>
-<clipPath id="mark">${shape}</clipPath>
+<linearGradient id="sx" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".3" stop-color="#fff"/><stop offset=".7" stop-color="#fff"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+<linearGradient id="sy" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".14" stop-color="#fff"/><stop offset=".86" stop-color="#fff"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+<mask id="markx" maskUnits="userSpaceOnUse" x="0" y="0" width="${W}" height="${H}">${softX}</mask>
+<mask id="marky" maskUnits="userSpaceOnUse" x="0" y="0" width="${W}" height="${H}">${softY}</mask>
+<radialGradient id="pool"><stop class="hue" offset="0" stop-color="${HUES[0]}" stop-opacity=".55"/><stop class="hue" offset="1" stop-color="${HUES[0]}" stop-opacity="0"/></radialGradient>
 <mask id="drops" maskUnits="userSpaceOnUse" x="0" y="0" width="${W}" height="${H}"><g class="trails">${trails.join('')}</g></mask>
 ${glyphTile('dim', '#8f949b', 3)}
 ${glyphTile('lit', '#ffd9c2', 3)}
 <radialGradient id="vig" cx=".5" cy=".5" r=".75"><stop offset=".55" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".55"/></radialGradient>
 </defs>
 <rect width="${W}" height="${H}" fill="#0b0d10"/>
+<ellipse class="wander" cx="800" cy="420" rx="900" ry="560" fill="url(#pool)" opacity=".16"/>
+<rect class="amb" x="0" y="${-ROWS * CH}" width="${W}" height="${H + ROWS * CH}" fill="url(#dim)" opacity=".028"/>
 <g mask="url(#fade)">
-<g opacity=".4">${glow}</g>
-<g clip-path="url(#mark)">
+<g opacity=".4" mask="url(#marky)">${glow}</g>
+<g mask="url(#markx)"><g mask="url(#marky)">
 <rect width="${W}" height="${H}" fill="url(#dim)" opacity=".1"/>
 <rect width="${W}" height="${H}" fill="url(#lit)" opacity=".5" mask="url(#drops)"/>
-</g>
+</g></g>
 </g>
 <rect width="${W}" height="${H}" fill="url(#vig)"/>
 </svg>`

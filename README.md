@@ -2,7 +2,7 @@
 
 A Claude Code mod that dresses the app in the innerpulse look: carbon ink by night and paper by day, an ember accent, and a backdrop scene behind frosted carbon glass.
 
-**The rain** (the default scene): the mark's six bars, scaled up to fill the window, made of glyphs. A dim, still field of hex digits and signs fills each bar, and brighter trails fall through it at their own speeds. Under it, the columns' soft glow keeps the mark's shape readable as its color drifts.
+**The rain** (the default scene): the mark's six bars, scaled up to fill the window, made of glyphs. A dim, still field of hex digits and signs fills each bar, and brighter trails fall through it at their own speeds. Under it, the columns' soft glow keeps the mark's shape readable as its color drifts, and every edge fades softly into the ground. Behind the whole window, a much fainter glyph field drifts down over three minutes and a broad pool of the same shifting light wanders across.
 
 **The columns** (`/innerpulse columns`): the six bars of the innerpulse mark scaled up to fill the window as tall, soft-edged columns of light. Each glows and fades on its own slow rhythm, so the mark keeps re-forming, and the light's color drifts over a minute from inky blue through plum to a dim ember and back.
 
