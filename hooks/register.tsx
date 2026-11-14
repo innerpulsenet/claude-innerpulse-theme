@@ -6,11 +6,12 @@ import { plateScene, workingGlyph } from './plate'
 import { makeColors } from './make-colors.js'
 import { GEOMETRY } from './geometry'
 import { columnsScene } from './columns'
+import { rainScene } from './rain'
 import { markScene } from './mark'
 import { SCENE as DIAL } from './scene'
 
 const P = 'innerpulse-theme'
-const sceneAtom = atom({ plugin: 'innerpulse-theme', key: 'scene' } as const, 'columns' as SceneName)
+const sceneAtom = atom({ plugin: 'innerpulse-theme', key: 'scene' } as const, 'rain' as SceneName)
 // Read once at session start, so the backdrop hook reads nothing while it draws, as the
 // theme-examples hooks do
 let hour = 12
@@ -94,7 +95,7 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'innerpulse',
-      description: 'innerpulse theme: columns, mark, plate, dial, glass on|off, palette on|off, off, or sound on|off|test',
+      description: 'innerpulse theme: rain, columns, mark, plate, dial, glass on|off, palette on|off, off, or sound on|off|test',
     })
     const unpainted = problems.find(line => line.startsWith("Desktop won't paint"))
     if (unpainted !== undefined) $.ui.toast(unpainted)
@@ -130,7 +131,7 @@ export const register: Register = on => {
     }
     if (arg === 'palette' && (value === 'on' || value === 'off')) await $.store.set(PALETTE, value === 'on')
     if (arg === 'glass' && (value === 'on' || value === 'off')) await $.store.set(GLASS, value === 'on')
-    if (arg === 'columns' || arg === 'mark' || arg === 'plate' || arg === 'dial') await update($, sceneAtom, () => arg)
+    if (arg === 'rain' || arg === 'columns' || arg === 'mark' || arg === 'plate' || arg === 'dial') await update($, sceneAtom, () => arg)
     const scene = await read($, sceneAtom)
     const set = await apply($)
     const palette = (await $.store.get(PALETTE)) !== false ? 'on' : 'off'
@@ -147,6 +148,9 @@ export const register: Register = on => {
     if (e.props.plugin !== P || e.surface !== 'desktop') return next(e)
     const { Svg } = $.ui.resolve(e)
     if (e.props.scene === 'innerpulse-dial') return <Svg isInteractive alt="A faint graduated dial turning slowly behind drifting fog" source={DIAL} />
+    if (e.props.scene === 'innerpulse-rain') {
+      return <Svg isInteractive alt="The six bars of the innerpulse mark made of glyphs, with brighter trails falling through them" source={rainScene()} />
+    }
     if (e.props.scene === 'innerpulse-columns') {
       return <Svg isInteractive alt="The six bars of the innerpulse mark as tall columns of slowly shifting light" source={columnsScene()} />
     }

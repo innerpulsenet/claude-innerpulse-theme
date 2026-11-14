@@ -1,6 +1,6 @@
 {
   "name": "innerpulse-theme",
-  "version": "0.8.0",
-  "description": "The innerpulse look for Claude Code: carbon and paper palettes, the innerpulse mark as tall columns of slowly shifting light, behind tinted glass",
+  "version": "0.9.0",
+  "description": "The innerpulse look for Claude Code: carbon and paper palettes, the innerpulse mark as a field of falling glyphs over slowly shifting light, behind tinted glass",
   "types": "./types/index.d.ts"
 }

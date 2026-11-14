@@ -8,7 +8,7 @@ const BACKDROP = {
   plugin: 'innerpulse-theme',
   component: 'Backdrop',
   surface: 'desktop',
-  props: { scene: 'innerpulse-columns', plugin: 'innerpulse-theme', glass: { blur: 14, tint: '#0b0d10', opacity: 0.5 } },
+  props: { scene: 'innerpulse-rain', plugin: 'innerpulse-theme', glass: { blur: 14, tint: '#0b0d10', opacity: 0.5 } },
 } as const
 
 // The engine beneath the mod: the ops it calls, and the ends of the chains it hooks
@@ -44,7 +44,7 @@ const scene = async ($: Engine) => {
   return { alt: String(svg?.props.alt), source: String(svg?.props.source) }
 }
 
-test('the columns loop on their own under tinted glass, turns leave it alone, and the palette and glass can be left off', async ($, on) => {
+test('the rain loops on its own under tinted glass, turns leave it alone, and the palette and glass can be left off', async ($, on) => {
   const clock = mock.clock(on, { now: T0 })
   mock.store(on, {})
   const w = engine(on)
@@ -52,7 +52,9 @@ test('the columns loop on their own under tinted glass, turns leave it alone, an
   await $.session.start({ cwd: '/tmp/x', surface: 'desktop', isInteractive: true })
 
   const rest = await scene($)
-  expect(rest.alt).toContain('columns of slowly shifting light')
+  expect(rest.alt).toContain('trails falling')
+  // Well under the 131,072-character limit on a scene
+  expect(rest.source.length).toBeLessThan(100_000)
   // One drawing whose motion loops by itself, still under reduced motion
   expect(rest.source).toContain('infinite')
   expect(rest.source).toContain('prefers-reduced-motion')
