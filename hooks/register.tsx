@@ -4,6 +4,8 @@ import type { EngineInterface, Register, ThemeSetArgs } from 'claude-code'
 import type { SceneName } from '../types'
 import { plateScene, workingGlyph } from './plate'
 import { makeColors } from './make-colors.js'
+import { GEOMETRY } from './geometry'
+import { probeScene, simpleScene } from './probe'
 import { SCENE as DIAL } from './scene'
 
 const P = 'innerpulse-theme'
@@ -53,7 +55,7 @@ const { theme, problems } = makeColors({
 })
 
 // Panels keep their own (now themed) color, frosted over the scene.
-const look = (scene: SceneName, withPalette: boolean): ThemeSetArgs => ({
+const look = (scene: SceneName | 'probe-card' | 'probe-simple', withPalette: boolean): ThemeSetArgs => ({
   ...(withPalette && { colors: theme }),
   backdrop: { scene: `innerpulse-${scene}`, glass: { blur: 14, opacity: 0.66 } },
 })
@@ -117,6 +119,21 @@ export const register: Register = on => {
       }
     }
     if (arg === 'palette' && (value === 'on' || value === 'off')) await $.store.set(PALETTE, value === 'on')
+    // Test scenes, to find what stops the backdrop's motion; /innerpulse beat goes back
+    if (arg === 'probe' && (value === 'card' || value === 'simple')) {
+      const withPalette = (await $.store.get(PALETTE)) !== false
+      await $.theme.set(
+        value === 'card'
+          ? look('probe-card', withPalette)
+          : { ...(withPalette && { colors: theme }), backdrop: { scene: 'innerpulse-probe-simple', glass: false } },
+      )
+      return {
+        text:
+          value === 'card'
+            ? 'innerpulse probe card: a red square that keeps blinking and a green dot that keeps sliding mean motion works. /innerpulse beat goes back.'
+            : 'innerpulse probe simple: the six bars of the mark with light passing through them every 4.8 seconds, and no frosted glass. /innerpulse beat goes back.',
+      }
+    }
     if (arg === 'beat' || arg === 'dial') await update($, sceneAtom, () => arg)
     const scene = await read($, sceneAtom)
     const set = await apply($)
@@ -133,6 +150,10 @@ export const register: Register = on => {
     if (e.props.plugin !== P || e.surface !== 'desktop') return next(e)
     const { Svg } = $.ui.resolve(e)
     if (e.props.scene === 'innerpulse-dial') return <Svg isInteractive alt="A faint graduated dial turning slowly behind drifting fog" source={DIAL} />
+    if (e.props.scene === 'innerpulse-probe-card') return <Svg isInteractive alt="The innerpulse test card" source={probeScene()} />
+    if (e.props.scene === 'innerpulse-probe-simple') {
+      return <Svg isInteractive alt="The six bars of the innerpulse mark, light passing through them" source={simpleScene(GEOMETRY.bars)} />
+    }
     if (e.props.scene !== 'innerpulse-beat') return next(e)
     return (
       <Svg

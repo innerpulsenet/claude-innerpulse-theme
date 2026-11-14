@@ -17,6 +17,7 @@ Everything holds still under reduced motion, and switches to paper colors in lig
 **Commands**
 
 - `/innerpulse beat` or `/innerpulse dial` picks the scene; the choice lasts the session.
+- `/innerpulse probe card` and `/innerpulse probe simple` show test scenes for diagnosing a background that will not move; `/innerpulse beat` goes back.
 - `/innerpulse palette off` keeps the backdrop but leaves the app's own colors; `/innerpulse palette on` brings the innerpulse palette back. Remembered across sessions.
 - `/innerpulse sound on`, `/innerpulse sound off`, `/innerpulse sound test`.
 - `/innerpulse off` turns the theme off; `/innerpulse` turns it back on.
