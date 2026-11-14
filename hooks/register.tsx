@@ -9,6 +9,13 @@ import { SCENE as DIAL } from './scene'
 const P = 'innerpulse-theme'
 const hourAtom = atom({ plugin: 'innerpulse-theme', key: 'hour' } as const, 12)
 const sceneAtom = atom({ plugin: 'innerpulse-theme', key: 'scene' } as const, 'beat' as SceneName)
+// The drift's step: each step is one redraw of the plate scene, which moves it a little
+const phaseAtom = atom({ plugin: 'innerpulse-theme', key: 'phase' } as const, 0)
+
+// The drift is on unless /innerpulse still turned it off (kept across sessions)
+const STILL = 'still'
+// How often the drift redraws the backdrop
+const DRIFT_MS = 18_000
 
 const SOUND = 'sound'
 // A turn this long earns the finish tick, when the sound is on
@@ -54,8 +61,7 @@ const look = (scene: SceneName): ThemeSetArgs => ({
   backdrop: { scene: `innerpulse-${scene}`, glass: { blur: 14, opacity: 0.66 } },
 })
 
-// When each running tool call began, for the working glyph. Nothing here redraws the backdrop:
-// it is one still drawing, made once a session (the desktop fades between redraws)
+// When each running tool call began, for the working glyph
 const tools = new Map<string, number>()
 
 const hourOf = (ms: number) => new Date(ms).getHours()
@@ -77,7 +83,7 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'innerpulse',
-      description: 'innerpulse theme: beat, dial, off, or sound on|off|test',
+      description: 'innerpulse theme: beat, dial, still, drift, off, or sound on|off|test',
     })
     const unpainted = problems.find(line => line.startsWith("Desktop won't paint"))
     if (unpainted !== undefined) $.ui.toast(unpainted)
@@ -85,6 +91,11 @@ export const register: Register = on => {
     await update($, hourAtom, () => hourOf(now))
     const set = await $.theme.set(look(await read($, sceneAtom)))
     if (!set.isDrawn) $.ui.status(`innerpulse: ${set.reason}`)
+    // The drift: a step every 18 s; writing the phase redraws the backdrop alone
+    $.clock.every(DRIFT_MS, async () => {
+      if ((await $.store.get(STILL)) === true) return
+      await update($, phaseAtom, prev => prev + 1)
+    })
     return next(e)
   })
 
@@ -123,6 +134,16 @@ export const register: Register = on => {
           : 'innerpulse sound off. /innerpulse sound on to hear a soft tick when a long turn finishes.',
       }
     }
+    if (arg === 'still' || arg === 'drift') {
+      await $.store.set(STILL, arg === 'still')
+      await update($, phaseAtom, prev => prev + 1)
+      return {
+        text:
+          arg === 'still'
+            ? 'innerpulse: the background holds still. /innerpulse drift to set it moving again.'
+            : 'innerpulse: the background drifts, a small step every 18 seconds. /innerpulse still to stop it.',
+      }
+    }
     if (arg === 'beat' || arg === 'dial') await update($, sceneAtom, () => arg)
     const scene = await read($, sceneAtom)
     const set = await $.theme.set(look(scene))
@@ -139,9 +160,11 @@ export const register: Register = on => {
     const { Svg } = $.ui.resolve(e)
     if (e.props.scene === 'innerpulse-dial') return <Svg source={DIAL} alt="A faint graduated dial behind fog" isInteractive />
     if (e.props.scene !== 'innerpulse-beat') return next(e)
+    const phase = await read($, phaseAtom)
+    const isStill = (await $.store.get(STILL)) === true
     return (
       <Svg
-        source={plateScene(await read($, hourAtom))}
+        source={plateScene(await read($, hourAtom), isStill ? undefined : phase)}
         alt="The innerpulse plate machined into the ground, its beat echoing away as a faint wave"
         isInteractive
       />

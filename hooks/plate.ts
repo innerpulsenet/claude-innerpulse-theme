@@ -1,6 +1,8 @@
-// The plate scene: one still drawing, made once per session. The desktop app holds a backdrop's
-// animation still after about two seconds and fades between redraws, so the scene never changes
-// while the session runs.
+// The plate scene. The desktop app runs a backdrop's animation for about two seconds after each
+// draw and then holds it, so motion comes from slow redraws: each `phase` is one draw, whose
+// short animation starts exactly where the last draw ended (the echo has travelled a little, the
+// fog has drifted, a soft light has passed through one slot) and ends on its own still frame.
+// Without a phase the scene is one still drawing.
 //
 // The innerpulse plate is machined into the ground at the top right, unlit; its six-bar beat
 // echoes out to the left as a long, faint mirrored wave that fades to nothing before the text
@@ -25,7 +27,7 @@ export const partOfDay = (hour: number): keyof typeof FOG =>
 
 // The echo: the mark's six heights repeated leftward from the plate, each beat smaller, with a
 // slow swell so it reads as a wave rather than a stamp. In the plate's own units (it spans -100..100).
-function echo(): string {
+function echo(offset: number): string {
   const heights = G.bars.map(b => b.h / 2)
   const pitch = 15
   const bw = 7
@@ -34,15 +36,41 @@ function echo(): string {
   for (let k = 0; k < count; k++) {
     const x = -116 - k * pitch
     const decay = Math.exp(-k / 70)
-    const swell = 0.72 + 0.28 * Math.cos(k / 9.5)
+    const swell = 0.72 + 0.28 * Math.cos((k + offset) / 9.5)
     const h = Math.max(3, heights[(heights.length - 1 - (k % heights.length))]! * decay * swell * 0.9)
     out.push(`<rect x="${f(x - bw)}" y="${f(-h)}" width="${bw}" height="${f(h * 2)}" rx="2"/>`)
   }
   return out.join('')
 }
 
-export function plateScene(hour: number): string {
+// How far each draw moves the scene: the echo's swell travels outward, the fog wanders
+const ECHO_STEP = 1.4
+const fogAt = (p: number) => ({ x: 70 * Math.sin(p * 0.33), y: 28 * Math.cos(p * 0.27) })
+// Each draw's motion, kept inside the two seconds the desktop animates
+const MOVE_MS = 1_600
+
+export function plateScene(hour: number, phase?: number): string {
   const fog = FOG[partOfDay(hour)]
+  const p = phase ?? 0
+  const isDrift = phase !== undefined
+  const from = fogAt(p - 1)
+  const to = fogAt(p)
+  const lit = G.slots[p % G.slots.length]!
+  const litWeight = G.light[p % G.slots.length]!
+  const motion = isDrift
+    ? `.fogm{transform:translate(${f(to.x)}px,${f(to.y)}px);animation:fd ${s(MOVE_MS)} ease-in-out both}` +
+      `@keyframes fd{from{transform:translate(${f(from.x)}px,${f(from.y)}px)}to{transform:translate(${f(to.x)}px,${f(to.y)}px)}}` +
+      `.e0{opacity:0;animation:eo ${s(MOVE_MS)} ease-in-out both}@keyframes eo{from{opacity:1}to{opacity:0}}` +
+      `.e1{animation:ei ${s(MOVE_MS)} ease-in-out both}@keyframes ei{from{opacity:0}to{opacity:1}}` +
+      `.pass{opacity:0;animation:ps 1.5s ease-in-out both}@keyframes ps{0%{opacity:0}45%{opacity:${f(0.32 * litWeight)}}100%{opacity:0}}` +
+      `@media (prefers-reduced-motion:reduce){.fogm,.e0,.e1,.pass{animation:none}}`
+    : ''
+  const echoes = isDrift
+    ? `<g class="e0">${echo((p - 1) * ECHO_STEP)}</g><g class="e1">${echo(p * ECHO_STEP)}</g>`
+    : echo(0)
+  const pass = isDrift
+    ? `<rect class="pass" x="${lit.x}" y="${lit.y}" width="${lit.w}" height="${lit.h}" rx="${lit.rx}" fill="url(#passg)"/>`
+    : ''
   const slots = G.slots
     .map(
       sl =>
@@ -58,7 +86,8 @@ export function plateScene(hour: number): string {
 @media (prefers-color-scheme:light){
 .ground{fill:${G.brand.paper}}.fogc{stop-color:${fog.light}}.fogg{stop-color:#ebe6dd}.p0{stop-color:#efebe4}.p1{stop-color:#e6e0d6}
 .edge{stroke:#fff;stroke-opacity:.75}.floor{fill:#d6cfc3}.wall{fill:#fff;opacity:.55}
-.echo{fill:#14171c;opacity:.05}.vig{opacity:0}.grain{opacity:.03}}
+.echo{fill:#14171c;opacity:.05}.vig{opacity:0}.grain{opacity:.03}.passc{stop-color:${G.brand.pulse}}}
+${motion}
 </style>
 <defs>
 <radialGradient id="fog"><stop class="fogc" offset="0" stop-opacity="${fog.a}"/><stop class="fogc" offset="1" stop-opacity="0"/></radialGradient>
@@ -68,17 +97,19 @@ export function plateScene(hour: number): string {
 <mask id="edgem"><rect x="-120" y="-120" width="240" height="240" fill="url(#edgeg)"/></mask>
 <linearGradient id="ex" x1="-1250" y1="0" x2="-110" y2="0" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#000"/><stop offset=".55" stop-color="#fff"/></linearGradient>
 <mask id="em"><rect x="-2400" y="-200" width="2300" height="400" fill="url(#ex)"/></mask>
+<linearGradient id="passg" x1="0" y1="0" x2="0" y2="1"><stop class="passc" offset="0" stop-color="${G.brand.hot}" stop-opacity="0"/><stop class="passc" offset=".5" stop-color="${G.brand.hot}"/><stop class="passc" offset="1" stop-color="${G.brand.hot}" stop-opacity="0"/></linearGradient>
 <radialGradient id="vigg" cx=".5" cy=".62" r=".78"><stop offset=".55" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".6"/></radialGradient>
 <filter id="grain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" stitchTiles="stitch"/><feColorMatrix values="0 0 0 0 .89  0 0 0 0 .9  0 0 0 0 .91  0 0 0 .9 0"/></filter>
 </defs>
 <rect class="ground" width="${W}" height="${H}"/>
-<ellipse cx="380" cy="230" rx="640" ry="400" fill="url(#fog)"/>
+<g class="fogm"><ellipse cx="380" cy="230" rx="640" ry="400" fill="url(#fog)"/></g>
 <ellipse cx="1180" cy="780" rx="720" ry="420" fill="url(#fog2)"/>
 <svg width="100%" height="100%" viewBox="-470 -170 540 540" preserveAspectRatio="xMaxYMin meet" overflow="visible">
-<g class="echo" mask="url(#em)">${echo()}</g>
+<g class="echo" mask="url(#em)">${echoes}</g>
 <path d="${G.plateD}" fill="url(#plate)" fill-rule="evenodd"/>
 <path d="${G.plateD}" fill="none" class="edge" stroke-width=".6" fill-rule="evenodd" mask="url(#edgem)"/>
 ${slots}
+${pass}
 </svg>
 <rect class="vig" width="${W}" height="${H}" fill="url(#vigg)"/>
 <rect class="grain" width="${W}" height="${H}" filter="url(#grain)"/>

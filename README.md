@@ -2,9 +2,9 @@
 
 A Claude Code mod that dresses the app in the innerpulse look: carbon ink by night and paper by day, an ember accent, and a backdrop scene behind frosted carbon glass.
 
-**The plate** (the default scene): one still drawing. Your innerpulse plate is machined into the ground at the top right, bleeding off the edge, its slots unlit. Its six-bar beat echoes out to the left as a long, faint mirrored wave that fades to nothing before the conversation. Ground tones only, no ember. The fog's tint follows the hour the session started: coral at dawn and dusk, ground-toned by day, cool at night.
+**The plate** (the default scene). Your innerpulse plate is machined into the ground at the top right, bleeding off the edge, its slots unlit. Its six-bar beat echoes out to the left as a long, faint mirrored wave that fades to nothing before the conversation. Ground tones only, no ember. The fog's tint follows the hour the session started: coral at dawn and dusk, ground-toned by day, cool at night.
 
-The scene is drawn once and never changes during a session. The desktop app runs a background's animation for only about two seconds and fades between redraws, so a changing background reads as flicker.
+**Drift:** every 18 seconds the scene takes one small step: the echo's swell travels outward, the fog wanders, and a soft light passes through one of the plate's slots, each in a different slot. The desktop app runs a background's animation for only about two seconds after each draw, so the motion comes from these slow redraws, each starting where the last ended. `/innerpulse still` holds the background still (remembered across sessions); `/innerpulse drift` sets it moving again.
 
 **Running tool calls** show the working glyph beside their row: the six bars at text height, with light passing through them where the app keeps it moving (desktop and the editor).
 
@@ -17,6 +17,7 @@ The glyph holds still under reduced motion, and everything switches to paper col
 **Commands**
 
 - `/innerpulse beat` or `/innerpulse dial` picks the scene; the choice lasts the session.
+- `/innerpulse still` or `/innerpulse drift` stops or starts the plate's drift.
 - `/innerpulse sound on`, `/innerpulse sound off`, `/innerpulse sound test`.
 - `/innerpulse off` turns the theme off; `/innerpulse` turns it back on.
 

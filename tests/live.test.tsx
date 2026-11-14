@@ -43,7 +43,7 @@ const scene = async ($: Engine) => {
   return { alt: String(svg?.props.alt), source: String(svg?.props.source) }
 }
 
-test('the plate is one still drawing that turns do not change', async ($, on) => {
+test('the plate drifts a step at a time and turns do not change it', async ($, on) => {
   const clock = mock.clock(on, { now: T0 })
   mock.store(on, {})
   const w = engine(on)
@@ -51,10 +51,10 @@ test('the plate is one still drawing that turns do not change', async ($, on) =>
 
   const rest = await scene($)
   expect(rest.alt).toContain('innerpulse plate')
-  // Nothing in it animates, and ember stays out of the atmosphere
-  expect(rest.source).not.toContain('@keyframes')
-  expect(rest.source).not.toContain('#f43a2a')
   expect(rest.source).toContain('class="echo"')
+  // Each step's motion is short, so it finishes inside the desktop's two seconds
+  expect(rest.source).toContain('@keyframes fd')
+  expect(rest.source).not.toMatch(/infinite/)
 
   await $.prompt.submit({ text: 'go' } as never)
   await $.tool.call({ tool: 'Bash', command: 'false' } as never)
@@ -62,6 +62,14 @@ test('the plate is one still drawing that turns do not change', async ($, on) =>
   for await (const _ of s);
   await $.turn.complete({ answer: 'a', durationMs: 90_000, isAborted: false, turnId: 't', reason: 'answer' } as never)
   expect((await scene($)).source).toBe(rest.source)
+
+  // A drift step draws the scene moved on; /innerpulse still holds it without motion
+  await clock.advance(18_000)
+  const moved = await scene($)
+  expect(moved.source).not.toBe(rest.source)
+  await $.command.run({ command: 'innerpulse', args: 'still' } as never)
+  expect((await scene($)).source).not.toContain('@keyframes')
+  await clock.advance(18_000)
 
   // Sound is off until asked for; on, a long turn ends with the tick
   expect(w.ran).toEqual([])
