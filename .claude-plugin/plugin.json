@@ -1,6 +1,6 @@
 {
   "name": "innerpulse-theme",
-  "version": "0.5.1",
-  "description": "The innerpulse look for Claude Code: carbon and paper palettes, the innerpulse plate and its beat as a faint, slowly drifting backdrop",
+  "version": "0.6.0",
+  "description": "The innerpulse look for Claude Code: carbon and paper palettes, the innerpulse plate and its beat as a faint backdrop that moves like weather",
   "types": "./types/index.d.ts"
 }

@@ -2,22 +2,22 @@
 
 A Claude Code mod that dresses the app in the innerpulse look: carbon ink by night and paper by day, an ember accent, and a backdrop scene behind frosted carbon glass.
 
-**The plate** (the default scene). Your innerpulse plate is machined into the ground at the top right, bleeding off the edge, its slots unlit. Its six-bar beat echoes out to the left as a long, faint mirrored wave that fades to nothing before the conversation. Ground tones only, no ember. The fog's tint follows the hour the session started: coral at dawn and dusk, ground-toned by day, cool at night.
+**The plate** (the default scene). Your innerpulse plate is machined into the ground at the top right, bleeding off the edge. Its six-bar beat echoes out to the left as a long, faint mirrored wave that fades to nothing before the conversation. The fog's tint follows the hour the session started: coral at dawn and dusk, ground-toned by day, cool at night.
 
-**Drift** (off by default, `/innerpulse drift` to try it): every 18 seconds the scene takes one small step: the echo's swell travels outward, the fog wanders, and a soft light passes through one of the plate's slots, each in a different slot. The desktop app runs a background's animation for only about two seconds after each draw, so the motion comes from these slow redraws, each starting where the last ended. Where the app freezes a background's motion (it does when it draws without GPU acceleration), each step only reads as a flicker, so the drift stays off until asked for; `/innerpulse still` turns it off again. The choice is remembered across sessions.
+It moves slowly, like weather: every 12 seconds a soft light ripples through the plate's slots, every 14 seconds a brighter band runs out along the echo, and the fog drifts on a 50-second swing.
 
 **Running tool calls** show the working glyph beside their row: the six bars at text height, with light passing through them where the app keeps it moving (desktop and the editor).
 
 **Sound** (off by default): `/innerpulse sound on` plays a soft, synthesized tick when a turn that ran a minute or more finishes. On Linux it plays through PipeWire or PulseAudio; on macOS through the engine's player.
 
-**The dial** is still there as a second scene: a faint graduated dial behind fog.
+**The dial** is still there as a second scene: a faint graduated dial turning slowly behind drifting fog.
 
-The glyph holds still under reduced motion, and everything switches to paper colors in light mode.
+Everything holds still under reduced motion, and switches to paper colors in light mode.
 
 **Commands**
 
 - `/innerpulse beat` or `/innerpulse dial` picks the scene; the choice lasts the session.
-- `/innerpulse still` or `/innerpulse drift` stops or starts the plate's drift.
+- `/innerpulse palette off` keeps the backdrop but leaves the app's own colors; `/innerpulse palette on` brings the innerpulse palette back. Remembered across sessions.
 - `/innerpulse sound on`, `/innerpulse sound off`, `/innerpulse sound test`.
 - `/innerpulse off` turns the theme off; `/innerpulse` turns it back on.
 

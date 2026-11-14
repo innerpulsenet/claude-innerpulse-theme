@@ -14,8 +14,9 @@ const BACKDROP = {
 // The engine beneath the mod: the ops it calls, and the ends of the chains it hooks
 const engine = (on: On) => {
   const ran: string[][] = []
+  const sets: { colors?: unknown }[] = []
   on('command.register', () => ({ value: { command: 'innerpulse' } }))
-  on('theme.set', () => ({ value: { isDrawn: true, requestId: 'r1' } }))
+  on('theme.set', (_, e) => (sets.push(e as never), { value: { isDrawn: true, requestId: 'r1' } }))
   on('ui.toast', () => ({ value: undefined }))
   on('process.run', (_, e) => (ran.push([...e.argv]), { value: { exitCode: 0, stdout: '', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
@@ -33,7 +34,7 @@ const engine = (on: On) => {
       usage: { model: e.model, input_tokens: 500, output_tokens: 900, cache_read_input_tokens: 30_000, cache_creation_input_tokens: 2_000 },
     } as never
   })
-  return { ran }
+  return { ran, sets }
 }
 
 const scene = async ($: Engine) => {
@@ -43,19 +44,19 @@ const scene = async ($: Engine) => {
   return { alt: String(svg?.props.alt), source: String(svg?.props.source) }
 }
 
-test('the plate drifts a step at a time and turns do not change it', async ($, on) => {
+test('the plate loops on its own, turns leave it alone, and the palette can be left off', async ($, on) => {
   const clock = mock.clock(on, { now: T0 })
   mock.store(on, {})
   const w = engine(on)
+  const sets = w.sets
   await $.session.start({ cwd: '/tmp/x', surface: 'desktop', isInteractive: true })
 
-  await $.command.run({ command: 'innerpulse', args: 'drift' } as never)
   const rest = await scene($)
   expect(rest.alt).toContain('innerpulse plate')
-  expect(rest.source).toContain('class="echo"')
-  // Each step's motion is short, so it finishes inside the desktop's two seconds
-  expect(rest.source).toContain('@keyframes fd')
-  expect(rest.source).not.toMatch(/infinite/)
+  // One drawing whose motion loops by itself, still under reduced motion
+  expect(rest.source).toContain('infinite')
+  expect(rest.source).toContain('prefers-reduced-motion')
+  expect(sets.at(-1)?.colors).toBeDefined()
 
   await $.prompt.submit({ text: 'go' } as never)
   await $.tool.call({ tool: 'Bash', command: 'false' } as never)
@@ -64,13 +65,9 @@ test('the plate drifts a step at a time and turns do not change it', async ($, o
   await $.turn.complete({ answer: 'a', durationMs: 90_000, isAborted: false, turnId: 't', reason: 'answer' } as never)
   expect((await scene($)).source).toBe(rest.source)
 
-  // A drift step draws the scene moved on; /innerpulse still holds it without motion
-  await clock.advance(18_000)
-  const moved = await scene($)
-  expect(moved.source).not.toBe(rest.source)
-  await $.command.run({ command: 'innerpulse', args: 'still' } as never)
-  expect((await scene($)).source).not.toContain('@keyframes')
-  await clock.advance(18_000)
+  const off = await $.command.run({ command: 'innerpulse', args: 'palette off' } as never)
+  expect(String(off.text)).toContain('without the innerpulse palette')
+  expect(sets.at(-1)?.colors).toBeUndefined()
 
   // Sound is off until asked for; on, a long turn ends with the tick
   expect(w.ran).toEqual([])

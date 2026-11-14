@@ -1,8 +1,4 @@
-// The plate scene. The desktop app runs a backdrop's animation for about two seconds after each
-// draw and then holds it, so motion comes from slow redraws: each `phase` is one draw, whose
-// short animation starts exactly where the last draw ended (the echo has travelled a little, the
-// fog has drifted, a soft light has passed through one slot) and ends on its own still frame.
-// Without a phase the scene is one still drawing.
+// The plate scene: one drawing that loops slowly on its own, like the theme-examples scenes.
 //
 // The innerpulse plate is machined into the ground at the top right, unlit; its six-bar beat
 // echoes out to the left as a long, faint mirrored wave that fades to nothing before the text
@@ -43,34 +39,27 @@ function echo(offset: number): string {
   return out.join('')
 }
 
-// How far each draw moves the scene: the echo's swell travels outward, the fog wanders
-const ECHO_STEP = 1.4
-const fogAt = (p: number) => ({ x: 70 * Math.sin(p * 0.33), y: 28 * Math.cos(p * 0.27) })
-// Each draw's motion, kept inside the two seconds the desktop animates
-const MOVE_MS = 1_600
+// The loop, slow enough to read as weather: light ripples through the plate's slots once every
+// 12 s, a brighter band runs out along the echo every 14 s, and the fog drifts on a 50 s swing
+const RIPPLE_S = 12
+const SHIMMER_S = 14
 
-export function plateScene(hour: number, phase?: number): string {
+export function plateScene(hour: number): string {
   const fog = FOG[partOfDay(hour)]
-  const p = phase ?? 0
-  const isDrift = phase !== undefined
-  const from = fogAt(p - 1)
-  const to = fogAt(p)
-  const lit = G.slots[p % G.slots.length]!
-  const litWeight = G.light[p % G.slots.length]!
-  const motion = isDrift
-    ? `.fogm{transform:translate(${f(to.x)}px,${f(to.y)}px);animation:fd ${s(MOVE_MS)} ease-in-out both}` +
-      `@keyframes fd{from{transform:translate(${f(from.x)}px,${f(from.y)}px)}to{transform:translate(${f(to.x)}px,${f(to.y)}px)}}` +
-      `.e0{opacity:0;animation:eo ${s(MOVE_MS)} ease-in-out both}@keyframes eo{from{opacity:1}to{opacity:0}}` +
-      `.e1{animation:ei ${s(MOVE_MS)} ease-in-out both}@keyframes ei{from{opacity:0}to{opacity:1}}` +
-      `.pass{opacity:0;animation:ps 1.5s ease-in-out both}@keyframes ps{0%{opacity:0}45%{opacity:${f(0.32 * litWeight)}}100%{opacity:0}}` +
-      `@media (prefers-reduced-motion:reduce){.fogm,.e0,.e1,.pass{animation:none}}`
-    : ''
-  const echoes = isDrift
-    ? `<g class="e0">${echo((p - 1) * ECHO_STEP)}</g><g class="e1">${echo(p * ECHO_STEP)}</g>`
-    : echo(0)
-  const pass = isDrift
-    ? `<rect class="pass" x="${lit.x}" y="${lit.y}" width="${lit.w}" height="${lit.h}" rx="${lit.rx}" fill="url(#passg)"/>`
-    : ''
+  const motion =
+    `@keyframes rp{0%{opacity:0}7%{opacity:1}22%{opacity:0}100%{opacity:0}}` +
+    G.slots.map((_, i) => `.r${i}{opacity:0;animation:rp ${RIPPLE_S}s ease-in-out ${f(i * 0.45)}s infinite}`).join('') +
+    `.band{animation:sh ${SHIMMER_S}s linear infinite}@keyframes sh{from{transform:translateX(0)}to{transform:translateX(-1400px)}}` +
+    `.fogm{animation:fd 50s ease-in-out infinite alternate}@keyframes fd{to{transform:translate(70px,28px)}}` +
+    `@media (prefers-reduced-motion:reduce){.pass,.band,.fogm{animation:none}.shimmer{display:none}}`
+  const ripple = G.slots
+    .map(
+      (sl, i) =>
+        `<g opacity="${f(0.34 * G.light[i]!)}"><rect class="pass r${i}" x="${sl.x}" y="${sl.y}" width="${sl.w}" height="${sl.h}" rx="${sl.rx}" fill="url(#passg)"/></g>`,
+    )
+    .join('')
+  const bars = echo(0)
+  const echoes = `${bars}<g class="shimmer" mask="url(#shm)">${bars}</g>`
   const slots = G.slots
     .map(
       sl =>
@@ -98,6 +87,8 @@ ${motion}
 <linearGradient id="ex" x1="-1250" y1="0" x2="-110" y2="0" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#000"/><stop offset=".55" stop-color="#fff"/></linearGradient>
 <mask id="em"><rect x="-2400" y="-200" width="2300" height="400" fill="url(#ex)"/></mask>
 <linearGradient id="passg" x1="0" y1="0" x2="0" y2="1"><stop class="passc" offset="0" stop-color="${G.brand.hot}" stop-opacity="0"/><stop class="passc" offset=".5" stop-color="${G.brand.hot}"/><stop class="passc" offset="1" stop-color="${G.brand.hot}" stop-opacity="0"/></linearGradient>
+<linearGradient id="bandg" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#000"/><stop offset=".5" stop-color="#fff"/><stop offset="1" stop-color="#000"/></linearGradient>
+<mask id="shm" maskUnits="userSpaceOnUse" x="-2400" y="-200" width="2400" height="400"><rect class="band" x="-260" y="-200" width="260" height="400" fill="url(#bandg)"/></mask>
 <radialGradient id="vigg" cx=".5" cy=".62" r=".78"><stop offset=".55" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".6"/></radialGradient>
 <filter id="grain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" stitchTiles="stitch"/><feColorMatrix values="0 0 0 0 .89  0 0 0 0 .9  0 0 0 0 .91  0 0 0 .9 0"/></filter>
 </defs>
@@ -109,7 +100,7 @@ ${motion}
 <path d="${G.plateD}" fill="url(#plate)" fill-rule="evenodd"/>
 <path d="${G.plateD}" fill="none" class="edge" stroke-width=".6" fill-rule="evenodd" mask="url(#edgem)"/>
 ${slots}
-${pass}
+${ripple}
 </svg>
 <rect class="vig" width="${W}" height="${H}" fill="url(#vigg)"/>
 <rect class="grain" width="${W}" height="${H}" filter="url(#grain)"/>
@@ -117,7 +108,7 @@ ${pass}
 }
 
 // The working glyph for a running tool call: the bare beat at text height, light passing through it.
-export function workingGlyph(elapsedMs: number, size = 14): string {
+export function workingGlyph(size = 14): string {
   const T = G.think
   const period = T.busy * 1000
   const bars = G.bars
@@ -128,7 +119,7 @@ export function workingGlyph(elapsedMs: number, size = 14): string {
     )
     .join('')
   const lit = G.bars
-    .map((_, i) => `.b${i}{animation:ps ${s(period)} ease-in-out infinite;animation-delay:${s(i * T.passLag * period - (elapsedMs % period))}}`)
+    .map((_, i) => `.b${i}{animation:ps ${s(period)} ease-in-out infinite;animation-delay:${s(i * T.passLag * period)}}`)
     .join('')
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="-110 -110 220 220">
 <style>
