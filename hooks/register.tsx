@@ -2,13 +2,12 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, ThemeSetArgs } from 'claude-code'
 
 import type { Live, SceneName } from '../types'
-import { liveScene, workingGlyph } from './live'
+import { AFTERGLOW_MS, liveScene, workingGlyph } from './live'
 import { makeColors } from './make-colors.js'
 import { SCENE as DIAL } from './scene'
 
 const P = 'innerpulse-theme'
-const liveAtom = atom({ plugin: 'innerpulse-theme', key: 'live' } as const, { mode: 'idle', since: 0 } as Live)
-const flashAtom = atom({ plugin: 'innerpulse-theme', key: 'flash' } as const, null)
+const liveAtom = atom({ plugin: 'innerpulse-theme', key: 'live' } as const, { mode: 'idle', since: 0, flag: null } as Live)
 const turnsAtom = atom({ plugin: 'innerpulse-theme', key: 'turns' } as const, [])
 const hourAtom = atom({ plugin: 'innerpulse-theme', key: 'hour' } as const, 12)
 const sceneAtom = atom({ plugin: 'innerpulse-theme', key: 'scene' } as const, 'beat' as SceneName)
@@ -56,30 +55,21 @@ const { theme, problems } = makeColors({
 // Panels keep their own (now themed) color, frosted over the scene.
 const look = (scene: SceneName): ThemeSetArgs => ({
   colors: theme,
-  backdrop: { scene: `innerpulse-${scene}`, glass: { blur: 14, opacity: 0.72 } },
+  backdrop: { scene: `innerpulse-${scene}`, glass: { blur: 14, opacity: 0.66 } },
 })
 
-// The session's work, as this module sees it: tool calls running and when each began,
-// the running turn's prompt tokens, and when the main thread's last response arrived
+// The session's work, as this module sees it: tool calls running and when each began, the
+// running turn's prompt tokens, when the main thread's last response arrived, and whether the
+// turn has had a failed call or a cache miss. None of it redraws the scene: the desktop reloads
+// the drawing on each redraw, so the plate changes only when a turn starts and when it ends
 const tools = new Map<string, number>()
-const turn = { tokens: 0, lastStepAt: null as number | null, flashes: 0 }
+const turn = { tokens: 0, lastStepAt: null as number | null, flags: 0, isFlagged: false }
 
 const hourOf = (ms: number) => new Date(ms).getHours()
 
-async function setMode($: EngineInterface, mode: 'idle' | 'think' | 'busy' | 'glow') {
+async function setMode($: EngineInterface, mode: Live['mode'], flag: number | null = null) {
   const now = await $.clock.now()
-  await update($, liveAtom, (prev): Live => (prev.mode === mode ? prev : { mode, since: now }))
-}
-
-async function flash($: EngineInterface) {
-  const now = await $.clock.now()
-  turn.flashes += 1
-  // Walk the slots, so two flashes in a row light two different slots
-  const slot = turn.flashes % 6
-  await update($, flashAtom, () => ({ slot, at: now }))
-  $.clock.after(3_000, () => {
-    void update($, flashAtom, f => (f && f.at === now ? null : f))
-  })
+  await update($, liveAtom, (prev): Live => (prev.mode === mode && mode === 'work' ? prev : { mode, since: now, flag }))
 }
 
 // The finish tick: on Linux through PipeWire or PulseAudio, else the engine's own player (macOS)
@@ -117,21 +107,20 @@ export const register: Register = on => {
 
   on('prompt.submit', async ($, e, next) => {
     turn.tokens = 0
-    await setMode($, tools.size > 0 ? 'busy' : 'think')
+    turn.isFlagged = false
+    await setMode($, 'work')
     return next(e)
   })
 
-  // While a tool runs, the light passes; a failed call flashes a slot
+  // Note when each call began, for the working glyph, and whether one failed
   on('tool.call', async ($, e, next) => {
     tools.set(e.tool_use_id, await $.clock.now())
-    await setMode($, 'busy')
     try {
       const result = await next(e)
-      if ('isError' in result && result.isError === true) await flash($)
+      if ('isError' in result && result.isError === true) turn.isFlagged = true
       return result
     } finally {
       tools.delete(e.tool_use_id)
-      if (tools.size === 0 && (await read($, liveAtom)).mode === 'busy') await setMode($, 'think')
     }
   })
 
@@ -144,7 +133,7 @@ export const register: Register = on => {
     turn.tokens += prompt
     const isMiss = turn.lastStepAt !== null && prompt >= MISS_MIN_TOKENS && usage.cache_read_input_tokens < prompt / 2
     turn.lastStepAt = await $.clock.now()
-    if (isMiss) await flash($)
+    if (isMiss) turn.isFlagged = true
     return result
   })
 
@@ -156,12 +145,13 @@ export const register: Register = on => {
       const size = turn.tokens
       await update($, turnsAtom, prev => [...prev, size].slice(-48))
     }
-    await setMode($, 'glow')
-    const since = (await read($, liveAtom)).since
-    // The afterglow cools for five seconds; then the plate is at rest
-    $.clock.after(6_000, () => {
-      void update($, liveAtom, (l): Live => (l.mode === 'glow' && l.since === since ? { mode: 'idle', since: l.since + 6_000 } : l))
-    })
+    // The afterglow; one slot cools from red when the turn had trouble, a different slot each time
+    let flag: number | null = null
+    if (turn.isFlagged) {
+      turn.flags += 1
+      flag = turn.flags % 6
+    }
+    await setMode($, 'done', flag)
     if (e.durationMs >= LONG_TURN_MS && (await $.store.get(SOUND)) === true) void tick($)
     return result
   })
@@ -200,7 +190,6 @@ export const register: Register = on => {
     if (e.props.scene !== 'innerpulse-beat') return next(e)
 
     const live = await read($, liveAtom)
-    const fl = await read($, flashAtom)
     const turns = await read($, turnsAtom)
     const hour = await read($, hourAtom)
     const now = await $.clock.now()
@@ -209,15 +198,11 @@ export const register: Register = on => {
       elapsedMs: Math.max(0, now - live.since),
       turns,
       hour,
-      flash: fl ? { slot: fl.slot, ageMs: Math.max(0, now - fl.at) } : undefined,
+      flag: live.flag,
     })
-    const doing = {
-      idle: 'at rest',
-      think: 'lit in turn while Claude thinks',
-      busy: 'with light passing while a tool runs',
-      glow: 'cooling after the turn',
-    }
-    return <Svg source={source} alt={`The innerpulse plate, ${doing[live.mode]}`} isInteractive />
+    const doing = { idle: 'at rest', work: 'lit in turn while Claude works', done: 'cooling after the turn' }
+    const mode = live.mode === 'done' && now - live.since >= AFTERGLOW_MS ? 'idle' : live.mode
+    return <Svg source={source} alt={`The innerpulse plate, ${doing[mode]}`} isInteractive />
   })
 
   // A tool call that runs long earns the working glyph beside its row

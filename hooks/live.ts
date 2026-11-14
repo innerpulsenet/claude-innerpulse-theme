@@ -1,16 +1,18 @@
-// The live beat scene, drawn at runtime from what the session is doing. Everything follows the
-// brand's working indicator (references/working.md in the kit), slowed to an ambient pace:
+// The live beat scene, drawn at runtime from what the session is doing. It follows the brand's
+// working indicator (references/working.md in the kit), slowed to an ambient pace:
 //   idle   the plate at rest, its slots dark
-//   think  the retake: light rises through the slots in turn, the strike hottest (4.8 s, 7.2 s after 20 s)
-//   busy   a tool runs: light passes through the standing plate, left to right (2.4 s)
-//   glow   the turn ended: the slots' light cools away over five seconds, the afterglow
-// and a flash: one slot lit red once, for a failed tool call or a cache miss.
+//   work   the retake: light rises through the slots in turn, the strike hottest, every 4.8 s
+//   done   the afterglow: the slots' light cools away over five seconds, then the plate rests;
+//          a slot is cooled from red when the turn had a failed tool call or a cache miss
+// The desktop reloads the drawing on every redraw, so the scene changes only twice a turn (work at
+// the prompt, done at the end) and everything in between is CSS animation inside one drawing.
 // Behind the plate, the brand's "reading": this session's own turn sizes as a faint mirrored band.
 // The plate only ever moves as light; under reduced motion it holds still.
 import { GEOMETRY as G } from './geometry'
 
-export type Mode = 'idle' | 'think' | 'busy' | 'glow'
-export type Flash = { slot: number; ageMs: number }
+export type Mode = 'idle' | 'work' | 'done'
+// The afterglow's length; past it a done plate draws as one at rest
+export const AFTERGLOW_MS = 5_000
 
 export type SceneInput = {
   mode: Mode
@@ -20,7 +22,8 @@ export type SceneInput = {
   turns: readonly number[]
   // the local hour, 0-23, for the fog's tint
   hour: number
-  flash?: Flash
+  // a slot to cool from red in the afterglow: the turn had a failed tool call or a cache miss
+  flag?: number | null
 }
 
 const W = 1600
@@ -38,35 +41,24 @@ const FOG: Record<'dawn' | 'day' | 'dusk' | 'night', { dark: string; light: stri
 export const partOfDay = (hour: number): keyof typeof FOG =>
   hour >= 5 && hour < 8 ? 'dawn' : hour >= 8 && hour < 17 ? 'day' : hour >= 17 && hour < 20 ? 'dusk' : 'night'
 
-function lampCss(mode: Mode, elapsedMs: number, flash?: Flash): string {
+function lampCss(mode: Mode, elapsedMs: number, flag: number | null): string {
   const T = G.think
   const rules: string[] = []
-  if (mode === 'think') {
-    const period = (elapsedMs > T.slowAfter * 1000 ? T.slowPeriod : T.period) * 2 * 1000
+  if (mode === 'work') {
+    const period = T.period * 2 * 1000
     rules.push(`@keyframes th{0%{opacity:0}9%{opacity:1}30%{opacity:.35}40%{opacity:0}100%{opacity:0}}`)
     G.slots.forEach((_, i) => {
       const start = (T.riseAt + i * T.riseLag) * period
       rules.push(`.l${i}{animation:th ${s(period)} linear infinite;animation-delay:${s(start - (elapsedMs % period))}}`)
     })
-  } else if (mode === 'busy') {
-    const period = T.busy * 2 * 1000
-    const on = T.passWidth * 100
-    rules.push(`@keyframes ps{0%{opacity:0}${f(on / 2)}%{opacity:1}${f(on)}%{opacity:0}100%{opacity:0}}`)
-    G.slots.forEach((_, i) => {
-      rules.push(`.l${i}{animation:ps ${s(period)} ease-in-out infinite;animation-delay:${s(i * T.passLag * period - (elapsedMs % period))}}`)
-    })
-  } else if (mode === 'glow') {
+  } else if (mode === 'done') {
     rules.push(`@keyframes gl{0%{opacity:.8}100%{opacity:0}}`)
-    rules.push(`.lamp{animation:gl 5s cubic-bezier(.2,.6,.3,1) forwards;animation-delay:${s(-elapsedMs)}}`)
+    rules.push(`.lamp,.flag{animation:gl ${s(AFTERGLOW_MS)} cubic-bezier(.2,.6,.3,1) forwards;animation-delay:${s(-elapsedMs)}}`)
   }
-  if (flash) {
-    rules.push(`@keyframes fl{0%{opacity:0}8%{opacity:.5}100%{opacity:0}}`)
-    rules.push(`.flash{animation:fl 2.4s ease-out forwards;animation-delay:${s(-flash.ageMs)}}`)
-  }
-  // Reduced motion: no movement; a working plate keeps a faint steady light, a flash a steady red
+  // Reduced motion: no movement; a working plate keeps a faint steady light
   const still =
-    `@media (prefers-reduced-motion:reduce){.lamp{animation:none;opacity:${mode === 'think' || mode === 'busy' ? '.4' : '0'}}` +
-    `.flash{animation:none;opacity:${flash ? '.4' : '0'}}.spill{animation:none}}`
+    `@media (prefers-reduced-motion:reduce){.lamp{animation:none;opacity:${mode === 'work' ? '.4' : '0'}}` +
+    `.flag{animation:none;opacity:0}.spill{animation:none}}`
   return rules.join('') + still
 }
 
@@ -90,17 +82,20 @@ function reading(turns: readonly number[]): string {
   return `<g class="reading" mask="url(#rm)">${bars}</g>`
 }
 
-export function liveScene(o: SceneInput): string {
+export function liveScene(input: SceneInput): string {
+  // A done plate whose afterglow has cooled draws at rest, so a later redraw replays nothing
+  const o: SceneInput = input.mode === 'done' && input.elapsedMs >= AFTERGLOW_MS ? { ...input, mode: 'idle', flag: null } : input
+  const flag = o.mode === 'done' ? (o.flag ?? null) : null
   const fog = FOG[partOfDay(o.hour)]
   const lamps = G.slots
     .map(
       (sl, i) =>
-        `<g opacity="${f(0.42 * G.light[i]!)}"><rect class="lamp l${i}" x="${sl.x}" y="${sl.y}" width="${sl.w}" height="${sl.h}" rx="${sl.rx}" fill="url(#lamp)"/></g>`,
+        `<g opacity="${f(0.85 * G.light[i]!)}"><rect class="lamp l${i}" x="${sl.x}" y="${sl.y}" width="${sl.w}" height="${sl.h}" rx="${sl.rx}" fill="url(#lamp)"/></g>`,
     )
     .join('')
-  const flashSlot = o.flash ? G.slots[o.flash.slot % G.slots.length]! : undefined
-  const flash = flashSlot
-    ? `<rect class="flash" x="${flashSlot.x}" y="${flashSlot.y}" width="${flashSlot.w}" height="${flashSlot.h}" rx="${flashSlot.rx}" fill="url(#red)" opacity="0"/>`
+  const flagSlot = flag === null ? undefined : G.slots[flag % G.slots.length]!
+  const flash = flagSlot
+    ? `<g opacity=".55"><rect class="flag" x="${flagSlot.x}" y="${flagSlot.y}" width="${flagSlot.w}" height="${flagSlot.h}" rx="${flagSlot.rx}" fill="url(#red)"/></g>`
     : ''
   const walls = G.slots
     .map(
@@ -111,10 +106,10 @@ export function liveScene(o: SceneInput): string {
     .join('')
   // The plate's spill of light: breathing with the work, cooling with the afterglow
   const spillCss =
-    o.mode === 'think' || o.mode === 'busy'
-      ? `.spill{opacity:.5;animation:sp ${o.mode === 'busy' ? '2.4s' : '4.8s'} ease-in-out infinite alternate}@keyframes sp{from{opacity:.25}to{opacity:.6}}`
-      : o.mode === 'glow'
-        ? `.spill{animation:gl 5s ease-out forwards;animation-delay:${s(-o.elapsedMs)}}`
+    o.mode === 'work'
+      ? `.spill{opacity:.5;animation:sp 4.8s ease-in-out infinite alternate}@keyframes sp{from{opacity:.25}to{opacity:.6}}`
+      : o.mode === 'done'
+        ? `.spill{animation:gl ${s(AFTERGLOW_MS)} ease-out forwards;animation-delay:${s(-o.elapsedMs)}}`
         : `.spill{opacity:0}`
 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid slice">
@@ -124,7 +119,7 @@ export function liveScene(o: SceneInput): string {
 .hot{stop-color:${G.brand.hot}}.emb{stop-color:${G.brand.pulse}}.spillc{stop-color:${G.brand.pulse}}.vig{opacity:1}
 .reading{fill:#e3e6e9;opacity:.05}.red0{stop-color:#ff6a5c}.red1{stop-color:${G.brand.pulse}}
 .lamp{opacity:0}
-${lampCss(o.mode, o.elapsedMs, o.flash)}
+${lampCss(o.mode, o.elapsedMs, flag)}
 ${spillCss}
 @media (prefers-color-scheme:light){
 .ground{fill:${G.brand.paper}}.fogc{stop-color:${fog.light}}.p0{stop-color:#efebe4}.p1{stop-color:#e7e2d9}
@@ -139,13 +134,12 @@ ${spillCss}
 <mask id="edgem"><rect x="-120" y="-120" width="240" height="240" fill="url(#edgeg)"/></mask>
 <linearGradient id="lamp" x1="0" y1="0" x2="0" y2="1"><stop class="emb" offset="0"/><stop class="hot" offset=".5" stop-opacity=".85"/><stop class="emb" offset="1"/></linearGradient>
 <linearGradient id="red" x1="0" y1="0" x2="0" y2="1"><stop class="red1" offset="0"/><stop class="red0" offset=".5"/><stop class="red1" offset="1"/></linearGradient>
-<radialGradient id="spillg"><stop class="spillc" offset="0" stop-opacity=".16"/><stop class="spillc" offset="1" stop-opacity="0"/></radialGradient>
+<radialGradient id="spillg"><stop class="spillc" offset="0" stop-opacity=".3"/><stop class="spillc" offset="1" stop-opacity="0"/></radialGradient>
 <radialGradient id="vigg" cx=".5" cy=".62" r=".78"><stop offset=".55" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".6"/></radialGradient>
 <linearGradient id="rmx" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#000"/><stop offset=".35" stop-color="#fff"/><stop offset="1" stop-color="#fff"/></linearGradient>
 <linearGradient id="rmy" x1="0" y1="0" x2="0" y2="1"><stop offset=".6" stop-color="#fff"/><stop offset="1" stop-color="#000"/></linearGradient>
 <mask id="rmy-m"><rect width="${W}" height="${H}" fill="url(#rmy)"/></mask>
 <mask id="rm"><g mask="url(#rmy-m)"><rect width="${W}" height="${H}" fill="url(#rmx)"/></g></mask>
-<filter id="grain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" stitchTiles="stitch"/><feColorMatrix values="0 0 0 0 .89  0 0 0 0 .9  0 0 0 0 .91  0 0 0 .9 0"/></filter>
 </defs>
 <rect class="ground" width="${W}" height="${H}"/>
 <ellipse cx="420" cy="260" rx="640" ry="400" fill="url(#fog)"/>
@@ -159,7 +153,6 @@ ${lamps}
 ${flash}
 </svg>
 <rect class="vig" width="${W}" height="${H}" fill="url(#vigg)"/>
-<rect width="${W}" height="${H}" filter="url(#grain)" opacity=".05"/>
 </svg>`
 }
 

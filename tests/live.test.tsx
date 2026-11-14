@@ -8,7 +8,7 @@ const BACKDROP = {
   plugin: 'innerpulse-theme',
   component: 'Backdrop',
   surface: 'desktop',
-  props: { scene: 'innerpulse-beat', plugin: 'innerpulse-theme', glass: { blur: 14, opacity: 0.72 } },
+  props: { scene: 'innerpulse-beat', plugin: 'innerpulse-theme', glass: { blur: 14, opacity: 0.66 } },
 } as const
 
 // The engine beneath the mod: the ops it calls, and the ends of the chains it hooks
@@ -43,7 +43,7 @@ const scene = async ($: Engine) => {
   return { alt: String(svg?.props.alt), source: String(svg?.props.source) }
 }
 
-test('the plate lights with the work, cools after it, and flashes a slot on a failed call', async ($, on) => {
+test('the plate lights for the turn, holds through its tool calls, and cools after it', async ($, on) => {
   const clock = mock.clock(on, { now: T0 })
   mock.store(on, {})
   const w = engine(on)
@@ -52,28 +52,31 @@ test('the plate lights with the work, cools after it, and flashes a slot on a fa
   expect((await scene($)).alt).toContain('at rest')
 
   await $.prompt.submit({ text: 'go' } as never)
-  const thinking = await scene($)
-  expect(thinking.alt).toContain('thinks')
-  expect(thinking.source).toContain('@keyframes th')
+  const working = await scene($)
+  expect(working.alt).toContain('while Claude works')
+  expect(working.source).toContain('@keyframes th')
 
-  // A failed tool call: one slot flashes, and with no tool left running the plate thinks again
+  // Tool calls inside the turn change nothing: the drawing is not redrawn mid-turn
   await $.tool.call({ tool: 'Bash', command: 'false' } as never)
-  const failed = await scene($)
-  expect(failed.source).toContain('class="flash"')
-  expect(failed.alt).toContain('thinks')
-  await clock.advance(3_500)
-  expect((await scene($)).source).not.toContain('class="flash"')
+  await $.tool.call({ tool: 'Bash', command: 'true' } as never)
+  expect((await scene($)).source).toBe(working.source)
+  expect((await scene($)).alt).toContain('while Claude works')
 
   const s = $.turn.step({ turnId: 't', index: 0, model: 'claude-opus-5-5', messageCount: 3 })
   for await (const _ of s);
   await $.turn.complete({ answer: 'a', durationMs: 90_000, isAborted: false, turnId: 't', reason: 'answer' } as never)
   const cooling = await scene($)
   expect(cooling.alt).toContain('cooling')
-  // The finished turn joins the reading behind the plate
+  // The failed call cools one slot from red, and the finished turn joins the reading
+  expect(cooling.source).toContain('class="flag"')
   expect(cooling.source).toContain('class="reading"')
 
-  await clock.advance(6_500)
-  expect((await scene($)).alt).toContain('at rest')
+  // Past the afterglow the plate draws at rest, with no animation left to replay
+  await clock.advance(5_500)
+  const rested = await scene($)
+  expect(rested.alt).toContain('at rest')
+  expect(rested.source).not.toContain('class="flag"')
+  expect(rested.source).not.toContain('@keyframes')
 
   // Sound is off until asked for; on, a long turn ends with the tick
   expect(w.ran).toEqual([])
