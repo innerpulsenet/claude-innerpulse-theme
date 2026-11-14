@@ -78,6 +78,10 @@ test('the plate lights for the turn, holds through its tool calls, and cools aft
   expect(rested.source).not.toContain('class="flag"')
   expect(rested.source).not.toContain('@keyframes')
 
+  // Status reports the draws: rest, then working, then the afterglow, then rest
+  const status = await $.command.run({ command: 'innerpulse', args: 'status' } as never)
+  expect(String(status.text)).toMatch(/Backdrop draws, oldest first: idle .*work .*done .*idle/)
+
   // Sound is off until asked for; on, a long turn ends with the tick
   expect(w.ran).toEqual([])
   await $.command.run({ command: 'innerpulse', args: 'sound on' } as never)

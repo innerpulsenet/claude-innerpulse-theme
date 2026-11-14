@@ -70,7 +70,12 @@ const hourOf = (ms: number) => new Date(ms).getHours()
 async function setMode($: EngineInterface, mode: Live['mode'], flag: number | null = null) {
   const now = await $.clock.now()
   await update($, liveAtom, (prev): Live => (prev.mode === mode && mode === 'work' ? prev : { mode, since: now, flag }))
+  // Ask for the redraw outright too, in case a surface caches the backdrop's drawing
+  $.ui.invalidate('ui.render')
 }
+
+// What the backdrop hook last drew, for /innerpulse status: each draw's state and time
+const draws: { mode: string; at: number }[] = []
 
 // The finish tick: on Linux through PipeWire or PulseAudio, else the engine's own player (macOS)
 async function tick($: EngineInterface) {
@@ -89,7 +94,7 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'innerpulse',
-      description: 'innerpulse theme: beat, dial, off, or sound on|off',
+      description: 'innerpulse theme: beat, dial, off, status, or sound on|off',
     })
     const unpainted = problems.find(line => line.startsWith("Desktop won't paint"))
     if (unpainted !== undefined) $.ui.toast(unpainted)
@@ -172,6 +177,15 @@ export const register: Register = on => {
           : 'innerpulse sound off. /innerpulse sound on to hear a soft tick when a long turn finishes.',
       }
     }
+    if (arg === 'status') {
+      const now = await $.clock.now()
+      const live = await read($, liveAtom)
+      const ago = (at: number) => `${Math.round((now - at) / 1000)}s ago`
+      const recent = draws.length === 0 ? 'none yet' : draws.map(d => `${d.mode} (${ago(d.at)})`).join(', ')
+      return {
+        text: `innerpulse: scene ${await read($, sceneAtom)}, plate ${live.mode} since ${ago(live.since)}. Backdrop draws, oldest first: ${recent}.`,
+      }
+    }
     if (arg === 'beat' || arg === 'dial') await update($, sceneAtom, () => arg)
     const scene = await read($, sceneAtom)
     const set = await $.theme.set(look(scene))
@@ -202,6 +216,8 @@ export const register: Register = on => {
     })
     const doing = { idle: 'at rest', work: 'lit in turn while Claude works', done: 'cooling after the turn' }
     const mode = live.mode === 'done' && now - live.since >= AFTERGLOW_MS ? 'idle' : live.mode
+    draws.push({ mode, at: now })
+    if (draws.length > 12) draws.shift()
     return <Svg source={source} alt={`The innerpulse plate, ${doing[mode]}`} isInteractive />
   })
 
