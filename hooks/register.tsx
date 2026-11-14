@@ -1,23 +1,18 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, ThemeSetArgs } from 'claude-code'
 
-import type { Live, SceneName } from '../types'
-import { AFTERGLOW_MS, liveScene, workingGlyph } from './live'
+import type { SceneName } from '../types'
+import { plateScene, workingGlyph } from './plate'
 import { makeColors } from './make-colors.js'
-import { probeScene } from './probe'
 import { SCENE as DIAL } from './scene'
 
 const P = 'innerpulse-theme'
-const liveAtom = atom({ plugin: 'innerpulse-theme', key: 'live' } as const, { mode: 'idle', since: 0, flag: null } as Live)
-const turnsAtom = atom({ plugin: 'innerpulse-theme', key: 'turns' } as const, [])
 const hourAtom = atom({ plugin: 'innerpulse-theme', key: 'hour' } as const, 12)
 const sceneAtom = atom({ plugin: 'innerpulse-theme', key: 'scene' } as const, 'beat' as SceneName)
 
 const SOUND = 'sound'
 // A turn this long earns the finish tick, when the sound is on
 const LONG_TURN_MS = 60_000
-// A request this big that the cache served less than half of re-sent its prefix
-const MISS_MIN_TOKENS = 20_000
 
 // The brand's two grounds: carbon ink by night, paper by day. Surfaces, text tiers and
 // status colors are the kit's own (references/themes.md, section 3); ember is the accent.
@@ -59,26 +54,11 @@ const look = (scene: SceneName): ThemeSetArgs => ({
   backdrop: { scene: `innerpulse-${scene}`, glass: { blur: 14, opacity: 0.66 } },
 })
 
-// The session's work, as this module sees it: tool calls running and when each began, the
-// running turn's prompt tokens, when the main thread's last response arrived, and whether the
-// turn has had a failed call or a cache miss. None of it redraws the scene: the desktop reloads
-// the drawing on each redraw, so the plate changes only when a turn starts and when it ends
+// When each running tool call began, for the working glyph. Nothing here redraws the backdrop:
+// it is one still drawing, made once a session (the desktop fades between redraws)
 const tools = new Map<string, number>()
-const turn = { tokens: 0, lastStepAt: null as number | null, flags: 0, isFlagged: false }
 
 const hourOf = (ms: number) => new Date(ms).getHours()
-
-async function setMode($: EngineInterface, mode: Live['mode'], flag: number | null = null) {
-  const now = await $.clock.now()
-  await update($, liveAtom, (prev): Live => (prev.mode === mode && mode === 'work' ? prev : { mode, since: now, flag }))
-  // Ask for the redraw outright too, in case a surface caches the backdrop's drawing
-  $.ui.invalidate('ui.render')
-}
-
-// What the backdrop hook last drew, for /innerpulse status: each draw's state and time
-const draws: { mode: string; at: number }[] = []
-// When /innerpulse probe last asked for the test card
-let probeAt = ''
 
 // The finish tick: on Linux through PipeWire or PulseAudio, else the engine's own player (macOS)
 async function tick($: EngineInterface) {
@@ -97,7 +77,7 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'innerpulse',
-      description: 'innerpulse theme: beat, dial, off, status, probe, or sound on|off',
+      description: 'innerpulse theme: beat, dial, off, or sound on|off|test',
     })
     const unpainted = problems.find(line => line.startsWith("Desktop won't paint"))
     if (unpainted !== undefined) $.ui.toast(unpainted)
@@ -105,61 +85,24 @@ export const register: Register = on => {
     await update($, hourAtom, () => hourOf(now))
     const set = await $.theme.set(look(await read($, sceneAtom)))
     if (!set.isDrawn) $.ui.status(`innerpulse: ${set.reason}`)
-    // The fog follows the time of day: look at the hour every ten minutes, redraw when it turns
-    $.clock.every(10 * 60_000, async () => {
-      const h = hourOf(await $.clock.now())
-      if (h !== (await read($, hourAtom))) await update($, hourAtom, () => h)
-    })
     return next(e)
   })
 
-  on('prompt.submit', async ($, e, next) => {
-    turn.tokens = 0
-    turn.isFlagged = false
-    await setMode($, 'work')
-    return next(e)
-  })
-
-  // Note when each call began, for the working glyph, and whether one failed
+  // Note when each call began, for the working glyph
   on('tool.call', async ($, e, next) => {
     tools.set(e.tool_use_id, await $.clock.now())
     try {
-      const result = await next(e)
-      if ('isError' in result && result.isError === true) turn.isFlagged = true
-      return result
+      return await next(e)
     } finally {
       tools.delete(e.tool_use_id)
     }
   })
 
-  // Count the turn's prompt and catch a cold cache on the main thread
-  on('turn.step', async function* ($, e, next) {
-    const result = yield* next(e)
-    const usage = result.usage
-    if (!usage || typeof e.agentId === 'string') return result
-    const prompt = usage.input_tokens + usage.cache_read_input_tokens + usage.cache_creation_input_tokens
-    turn.tokens += prompt
-    const isMiss = turn.lastStepAt !== null && prompt >= MISS_MIN_TOKENS && usage.cache_read_input_tokens < prompt / 2
-    turn.lastStepAt = await $.clock.now()
-    if (isMiss) turn.isFlagged = true
-    return result
-  })
-
+  // The finish tick, when the sound is on and the turn ran a minute or more
   on('turn.complete', async ($, e, next) => {
     const result = await next(e)
     if ('agentId' in e && typeof e.agentId === 'string') return result
     tools.clear()
-    if (turn.tokens > 0) {
-      const size = turn.tokens
-      await update($, turnsAtom, prev => [...prev, size].slice(-48))
-    }
-    // The afterglow; one slot cools from red when the turn had trouble, a different slot each time
-    let flag: number | null = null
-    if (turn.isFlagged) {
-      turn.flags += 1
-      flag = turn.flags % 6
-    }
-    await setMode($, 'done', flag)
     if (e.durationMs >= LONG_TURN_MS && (await $.store.get(SOUND)) === true) void tick($)
     return result
   })
@@ -180,26 +123,6 @@ export const register: Register = on => {
           : 'innerpulse sound off. /innerpulse sound on to hear a soft tick when a long turn finishes.',
       }
     }
-    if (arg === 'status') {
-      const now = await $.clock.now()
-      const live = await read($, liveAtom)
-      const ago = (at: number) => `${Math.round((now - at) / 1000)}s ago`
-      const recent = draws.length === 0 ? 'none yet' : draws.map(d => `${d.mode} (${ago(d.at)})`).join(', ')
-      return {
-        text: `innerpulse: scene ${await read($, sceneAtom)}, plate ${live.mode} since ${ago(live.since)}. Backdrop draws, oldest first: ${recent}.`,
-      }
-    }
-    if (arg === 'probe') {
-      // A test card in place of the scene for twenty seconds, then the scene again
-      probeAt = new Date(await $.clock.now()).toLocaleTimeString()
-      await $.theme.set({ colors: theme, backdrop: { scene: 'innerpulse-probe', glass: false } })
-      $.clock.after(20_000, async () => {
-        await $.theme.set(look(await read($, sceneAtom)))
-      })
-      return {
-        text: 'innerpulse probe: a test card replaces the background for 20 seconds. A red square that blinks means CSS animation runs there; a green dot that slides means SMIL runs; an orange line means the app reports reduced motion.',
-      }
-    }
     if (arg === 'beat' || arg === 'dial') await update($, sceneAtom, () => arg)
     const scene = await read($, sceneAtom)
     const set = await $.theme.set(look(scene))
@@ -214,30 +137,19 @@ export const register: Register = on => {
     if (e.props.plugin !== P) return next(e)
     if (e.surface !== 'desktop' && e.surface !== 'mobile') return next(e)
     const { Svg } = $.ui.resolve(e)
-    if (e.props.scene === 'innerpulse-probe') return <Svg source={probeScene(probeAt)} alt="The innerpulse test card" isInteractive />
-    if (e.props.scene === 'innerpulse-dial') return <Svg source={DIAL} alt="A faint graduated dial turning slowly" isInteractive />
+    if (e.props.scene === 'innerpulse-dial') return <Svg source={DIAL} alt="A faint graduated dial behind fog" isInteractive />
     if (e.props.scene !== 'innerpulse-beat') return next(e)
-
-    const live = await read($, liveAtom)
-    const turns = await read($, turnsAtom)
-    const hour = await read($, hourAtom)
-    const now = await $.clock.now()
-    const source = liveScene({
-      mode: live.mode,
-      elapsedMs: Math.max(0, now - live.since),
-      turns,
-      hour,
-      flag: live.flag,
-    })
-    const doing = { idle: 'at rest', work: 'glowing while Claude works', done: 'cooling after the turn' }
-    const mode = live.mode === 'done' && now - live.since >= AFTERGLOW_MS ? 'idle' : live.mode
-    draws.push({ mode, at: now })
-    if (draws.length > 12) draws.shift()
-    return <Svg source={source} alt={`The innerpulse plate, ${doing[mode]}`} isInteractive />
+    return (
+      <Svg
+        source={plateScene(await read($, hourAtom))}
+        alt="The innerpulse plate machined into the ground, its beat echoing away as a faint wave"
+        isInteractive
+      />
+    )
   })
 
   // A running tool call shows the working glyph beside its row, at once: the desktop holds an
-// animation still after about two seconds, so a delayed fade-in would never show
+  // animation still after about two seconds, so a delayed fade-in would never show
   on('ui.render', { component: 'ToolUse' }, async ($, e, next) => {
     const row = await next(e)
     if (!e.props.isRunning || (e.surface !== 'desktop' && e.surface !== 'vscode')) return row
