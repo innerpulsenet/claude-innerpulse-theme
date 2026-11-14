@@ -49,8 +49,10 @@ function lampCss(mode: Mode, elapsedMs: number, flag: number | null): string {
     rules.push(`@keyframes th{0%{opacity:0}9%{opacity:1}30%{opacity:.35}40%{opacity:0}100%{opacity:0}}`)
     G.slots.forEach((_, i) => {
       const start = (T.riseAt + i * T.riseLag) * period
-      rules.push(`.l${i}{animation:th ${s(period)} linear infinite;animation-delay:${s(start - (elapsedMs % period))}}`)
+      rules.push(`.l${i}{animation:th ${s(period)} linear infinite both;animation-delay:${s(start - (elapsedMs % period))}}`)
     })
+    // Where a surface does not run the animation, the working plate still holds a steady glow
+    rules.unshift(`.lamp{opacity:.35}`)
   } else if (mode === 'done') {
     rules.push(`@keyframes gl{0%{opacity:.8}100%{opacity:0}}`)
     rules.push(`.lamp,.flag{animation:gl ${s(AFTERGLOW_MS)} cubic-bezier(.2,.6,.3,1) forwards;animation-delay:${s(-elapsedMs)}}`)

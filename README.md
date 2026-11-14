@@ -26,6 +26,7 @@ Everything holds still under reduced motion, and switches to paper colors in lig
 - `/innerpulse beat` or `/innerpulse dial` picks the scene; the choice lasts the session.
 - `/innerpulse sound on`, `/innerpulse sound off`, `/innerpulse sound test`.
 - `/innerpulse status` says what the plate is doing and what the backdrop last drew.
+- `/innerpulse probe` puts a test card in place of the background for 20 seconds, showing whether the app draws it and runs its animation.
 - `/innerpulse off` turns the theme off; `/innerpulse` turns it back on.
 
 **Rebuilding the generated files**: `node scripts/build-geometry.mjs <path to the innerpulse-brand kit's scripts/pulse.mjs>` writes `hooks/geometry.ts`; `node scripts/build-sound.mjs` writes `sounds/done.wav`.

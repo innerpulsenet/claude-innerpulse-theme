@@ -4,6 +4,7 @@ import type { EngineInterface, Register, ThemeSetArgs } from 'claude-code'
 import type { Live, SceneName } from '../types'
 import { AFTERGLOW_MS, liveScene, workingGlyph } from './live'
 import { makeColors } from './make-colors.js'
+import { probeScene } from './probe'
 import { SCENE as DIAL } from './scene'
 
 const P = 'innerpulse-theme'
@@ -76,6 +77,8 @@ async function setMode($: EngineInterface, mode: Live['mode'], flag: number | nu
 
 // What the backdrop hook last drew, for /innerpulse status: each draw's state and time
 const draws: { mode: string; at: number }[] = []
+// When /innerpulse probe last asked for the test card
+let probeAt = ''
 
 // The finish tick: on Linux through PipeWire or PulseAudio, else the engine's own player (macOS)
 async function tick($: EngineInterface) {
@@ -94,7 +97,7 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'innerpulse',
-      description: 'innerpulse theme: beat, dial, off, status, or sound on|off',
+      description: 'innerpulse theme: beat, dial, off, status, probe, or sound on|off',
     })
     const unpainted = problems.find(line => line.startsWith("Desktop won't paint"))
     if (unpainted !== undefined) $.ui.toast(unpainted)
@@ -186,6 +189,17 @@ export const register: Register = on => {
         text: `innerpulse: scene ${await read($, sceneAtom)}, plate ${live.mode} since ${ago(live.since)}. Backdrop draws, oldest first: ${recent}.`,
       }
     }
+    if (arg === 'probe') {
+      // A test card in place of the scene for twenty seconds, then the scene again
+      probeAt = new Date(await $.clock.now()).toLocaleTimeString()
+      await $.theme.set({ colors: theme, backdrop: { scene: 'innerpulse-probe', glass: false } })
+      $.clock.after(20_000, async () => {
+        await $.theme.set(look(await read($, sceneAtom)))
+      })
+      return {
+        text: 'innerpulse probe: a test card replaces the background for 20 seconds. A red square that blinks means CSS animation runs there; a green dot that slides means SMIL runs; an orange line means the app reports reduced motion.',
+      }
+    }
     if (arg === 'beat' || arg === 'dial') await update($, sceneAtom, () => arg)
     const scene = await read($, sceneAtom)
     const set = await $.theme.set(look(scene))
@@ -200,6 +214,7 @@ export const register: Register = on => {
     if (e.props.plugin !== P) return next(e)
     if (e.surface !== 'desktop' && e.surface !== 'mobile') return next(e)
     const { Svg } = $.ui.resolve(e)
+    if (e.props.scene === 'innerpulse-probe') return <Svg source={probeScene(probeAt)} alt="The innerpulse test card" isInteractive />
     if (e.props.scene === 'innerpulse-dial') return <Svg source={DIAL} alt="A faint graduated dial turning slowly" isInteractive />
     if (e.props.scene !== 'innerpulse-beat') return next(e)
 
