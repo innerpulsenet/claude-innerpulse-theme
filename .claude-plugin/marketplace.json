@@ -1,0 +1,6 @@
+{
+  "name": "innerpulse-theme",
+  "description": "The innerpulse look for Claude Code",
+  "owner": { "name": "innerpulsenet" },
+  "plugins": [{ "name": "innerpulse-theme", "source": "./" }]
+}
