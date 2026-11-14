@@ -13,7 +13,7 @@ The desktop app runs a background's animation for about two seconds after each r
 
 Behind it, faint on the left, is the brand's reading: this session's own turns as a mirrored band, one bar per turn sized by its prompt, newest nearest the plate. The fog's tint follows the time of day: coral at dawn and dusk, ground-toned by day, cool at night.
 
-**Long tool calls** get the working glyph beside their row once they have run eight seconds: the six bars at text height with light passing through them (desktop and the editor).
+**Running tool calls** show the working glyph beside their row: the six bars at text height, with light passing through them where the app keeps it moving (desktop and the editor).
 
 **Sound** (off by default): `/innerpulse sound on` plays a soft, synthesized tick when a turn that ran a minute or more finishes. On Linux it plays through PipeWire or PulseAudio; on macOS through the engine's player.
 

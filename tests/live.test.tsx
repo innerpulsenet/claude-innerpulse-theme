@@ -91,7 +91,7 @@ test('the plate lights for the turn, holds through its tool calls, and cools aft
   expect(w.ran[0]?.[0]).toBe('pw-play')
 })
 
-test('a long tool call earns the working glyph on desktop, not in the terminal', async ($, on) => {
+test('a running tool call shows the working glyph on desktop, not in the terminal', async ($, on) => {
   mock.clock(on, { now: T0 })
   mock.store(on, {})
   engine(on)
@@ -104,7 +104,7 @@ test('a long tool call earns the working glyph on desktop, not in the terminal',
       props: { tool_use_id: 'tu1', tool: 'Bash', input: {}, isRunning: true, isErrored: false, isInterrupted: false },
     } as never)
     const glyph = await ui.find({ type: 'Svg' })
-    if (surface === 'desktop') expect(String(glyph?.props.source)).toContain('animation-delay:8s')
+    if (surface === 'desktop') expect(String(glyph?.props.source)).toContain('class="bar"')
     else expect(glyph).toBeUndefined()
     await ui.unmount()
   }

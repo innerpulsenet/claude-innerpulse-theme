@@ -236,7 +236,8 @@ export const register: Register = on => {
     return <Svg source={source} alt={`The innerpulse plate, ${doing[mode]}`} isInteractive />
   })
 
-  // A tool call that runs long earns the working glyph beside its row
+  // A running tool call shows the working glyph beside its row, at once: the desktop holds an
+// animation still after about two seconds, so a delayed fade-in would never show
   on('ui.render', { component: 'ToolUse' }, async ($, e, next) => {
     const row = await next(e)
     if (!e.props.isRunning || (e.surface !== 'desktop' && e.surface !== 'vscode')) return row

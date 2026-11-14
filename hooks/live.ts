@@ -173,12 +173,10 @@ ${flash}
 </svg>`
 }
 
-// The working glyph for a long tool call: the bare beat at text height, light passing through it.
-// It fades in once the call has run eight seconds, so quick calls never show it.
+// The working glyph for a running tool call: the bare beat at text height, light passing through it.
 export function workingGlyph(elapsedMs: number, size = 14): string {
   const T = G.think
   const period = T.busy * 1000
-  const delay = Math.max(0, 8000 - elapsedMs)
   const bars = G.bars
     .map(
       (b, i) =>
@@ -191,10 +189,9 @@ export function workingGlyph(elapsedMs: number, size = 14): string {
     .join('')
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="-110 -110 220 220">
 <style>
-svg{opacity:0;animation:in .3s ease-out forwards;animation-delay:${s(delay)}}@keyframes in{to{opacity:1}}
 .bar{fill:${G.brand.pulse}}.lit{fill:${G.brand.hot}}
 @keyframes ps{0%{opacity:0}13%{opacity:.9}26%{opacity:0}100%{opacity:0}}${lit}
 @media (prefers-color-scheme:light){.bar{fill:${G.brand.pulseDeep}}.lit{fill:${G.brand.pulse}}}
-@media (prefers-reduced-motion:reduce){.lit{animation:none}svg{animation:none;opacity:${delay > 0 ? 0 : 1}}}
+@media (prefers-reduced-motion:reduce){.lit{animation:none}}
 </style>${bars}</svg>`
 }
